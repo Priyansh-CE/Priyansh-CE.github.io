@@ -5,14 +5,10 @@
   <title>Priyansh | Projects</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- GOOGLE ADSENSE CODE -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5962326007028196"
-     crossorigin="anonymous"></script>
-
   <style>
     body {
       margin: 0;
-      font-family: Arial, Helvetica, sans-serif;
+      font-family: Arial, sans-serif;
       background: #020617;
       color: #e5e7eb;
       display: flex;
@@ -20,40 +16,43 @@
       align-items: center;
       min-height: 100vh;
     }
-    .box {
-      background: rgba(15, 23, 42, 0.85);
-      padding: 30px;
+    .container {
+      max-width: 500px;
+      text-align: center;
+      padding: 24px;
       border-radius: 16px;
-      max-width: 700px;
-      width: 100%;
-      box-shadow: 0 0 40px rgba(56,189,248,0.3);
+      background: #020617;
+      box-shadow: 0 0 25px rgba(56,189,248,0.15);
     }
-    h1 { color: #38bdf8; }
-    a { color: #22c55e; text-decoration: none; font-weight: 600; }
-    a:hover { text-decoration: underline; }
-    footer { margin-top: 20px; font-size: 12px; text-align: center; }
+    h1 {
+      color: #38bdf8;
+      margin-bottom: 10px;
+    }
+    a {
+      display: block;
+      margin-top: 16px;
+      padding: 14px;
+      text-decoration: none;
+      color: #020617;
+      background: #22c55e;
+      border-radius: 10px;
+      font-weight: bold;
+    }
+    a:hover {
+      background: #16a34a;
+    }
   </style>
 </head>
-
 <body>
-  <div class="box">
+
+  <div class="container">
     <h1>Welcome 👋</h1>
     <p>This is my project hosting website.</p>
 
-    <h2>Projects</h2>
-    <ul>
-      <li>
-        🎮 <a href="https://priyansh-ce.github.io/snake-web-game/" target="_blank">
-          Neon Snake Web Game
-        </a>
-      </li>
-    </ul>
+    <h3>Projects</h3>
 
-    <footer>
-      <a href="https://priyansh-ce.github.io/snake-web-game/privacy.html" target="_blank">
-        Privacy Policy
-      </a>
-    </footer>
+    <a href="./snake-web-game/">🎮 Neon Snake Web Game</a>
   </div>
+
 </body>
 </html>
