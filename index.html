@@ -2,31 +2,24 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Ultimate Snake Arena</title>
+<title>Snake Arena ELITE</title>
 <style>
-body{margin:0;overflow:hidden;background:#040814;font-family:Arial;}
-canvas{display:block;}
+body{margin:0;overflow:hidden;background:#050816;font-family:Arial}
+canvas{display:block}
 #menu{
 position:fixed;top:50%;left:50%;
 transform:translate(-50%,-50%);
-text-align:center;color:white;display:none;
-}
+color:white;text-align:center;display:none}
 button{
-padding:10px 20px;margin:5px;
-border:none;font-weight:bold;cursor:pointer;
-background:#22c55e;color:black;
-}
+padding:10px 20px;margin:10px;
+border:none;background:#22c55e;
+color:black;font-weight:bold;cursor:pointer}
 #leaderboard{
 position:fixed;top:10px;right:10px;
-color:white;font-size:14px;
-}
+color:white;font-size:14px}
 #ui{
 position:fixed;bottom:10px;left:10px;
-color:white;font-size:14px;
-}
-select{
-padding:5px;margin-top:5px;
-}
+color:white;font-size:14px}
 </style>
 </head>
 <body>
@@ -34,22 +27,15 @@ padding:5px;margin-top:5px;
 <canvas id="game"></canvas>
 
 <div id="leaderboard"></div>
-
 <div id="ui">
-Boost: <span id="boostBar"></span><br>
-Magnet: <span id="magnetStatus">OFF</span><br>
-Highscore: <span id="highscore"></span>
+Boost: <span id="boost">100</span><br>
+Magnet: <span id="magnet">OFF</span><br>
+Highscore: <span id="high"></span>
 </div>
 
 <div id="menu">
 <h1>GAME OVER</h1>
-<p id="finalScore"></p>
-<select id="skinSelect">
-<option value="#4ade80">Green</option>
-<option value="#38bdf8">Blue</option>
-<option value="#f472b6">Pink</option>
-<option value="#facc15">Gold</option>
-</select><br>
+<p id="score"></p>
 <button onclick="restart()">Restart</button>
 </div>
 
@@ -59,18 +45,19 @@ const ctx=canvas.getContext("2d");
 canvas.width=window.innerWidth;
 canvas.height=window.innerHeight;
 
-const WORLD=4000;
+const WORLD=5000;
+
 let player,enemies=[],foods=[],particles=[];
 let gameOver=false;
-let highscore=localStorage.getItem("snakeHigh")||0;
+let highscore=localStorage.getItem("eliteHigh")||0;
 
 class Snake{
 constructor(x,y,color,isAI=false){
 this.points=[];
 this.angle=0;
 this.targetAngle=0;
-this.speed=2;
 this.baseSpeed=2;
+this.speed=2;
 this.length=300;
 this.radius=10;
 this.color=color;
@@ -91,8 +78,12 @@ if(this.isAI){
 let dx=player.points[0].x-this.points[0].x;
 let dy=player.points[0].y-this.points[0].y;
 let dist=Math.hypot(dx,dy);
-if(dist<600) this.targetAngle=Math.atan2(dy,dx);
-else this.targetAngle+=(Math.random()-0.5)*0.1;
+
+if(dist<800){
+this.targetAngle=Math.atan2(dy,dx);
+}else{
+this.targetAngle+=(Math.random()-0.5)*0.1;
+}
 }
 
 let diff=this.targetAngle-this.angle;
@@ -140,31 +131,31 @@ rare:Math.random()<0.05
 });
 }
 
-function createExplosion(x,y,color){
-for(let i=0;i<30;i++){
+function explosion(x,y,color){
+for(let i=0;i<40;i++){
 particles.push({
 x,y,
-vx:(Math.random()-0.5)*6,
-vy:(Math.random()-0.5)*6,
+vx:(Math.random()-0.5)*8,
+vy:(Math.random()-0.5)*8,
 life:60,
-color
-});
+color});
 }
 }
 
 function init(){
-player=new Snake(WORLD/2,WORLD/2,
-document.getElementById("skinSelect")?.value||"#4ade80");
+player=new Snake(WORLD/2,WORLD/2,"#4ade80");
 enemies=[];foods=[];particles=[];
 gameOver=false;
 document.getElementById("menu").style.display="none";
 
-for(let i=0;i<300;i++)spawnFood();
-for(let i=0;i<8;i++)
-enemies.push(new Snake(Math.random()*WORLD,
-Math.random()*WORLD,"#ef4444",true));
+for(let i=0;i<400;i++)spawnFood();
+for(let i=0;i<10;i++)
+enemies.push(new Snake(
+Math.random()*WORLD,
+Math.random()*WORLD,
+"#ef4444",true));
 
-document.getElementById("highscore").innerText=highscore;
+document.getElementById("high").innerText=highscore;
 }
 
 canvas.addEventListener("mousemove",e=>{
@@ -174,19 +165,18 @@ e.clientX-canvas.width/2);
 });
 
 document.addEventListener("keydown",e=>{
-if(e.key==="Shift" && player.stamina>0){
+if(e.key==="Shift"&&player.stamina>0){
 player.speed=4;
 }
 if(e.key==="m"){
 player.magnet=!player.magnet;
-document.getElementById("magnetStatus").innerText=
+document.getElementById("magnet").innerText=
 player.magnet?"ON":"OFF";
 }
 });
+
 document.addEventListener("keyup",e=>{
-if(e.key==="Shift"){
-player.speed=player.baseSpeed;
-}
+if(e.key==="Shift")player.speed=player.baseSpeed;
 });
 
 function checkCollisions(){
@@ -197,7 +187,7 @@ let dy=player.points[0].y-enemy.points[0].y;
 if(Math.hypot(dx,dy)<15){
 if(player.length>enemy.length){
 enemy.alive=false;
-createExplosion(enemy.points[0].x,
+explosion(enemy.points[0].x,
 enemy.points[0].y,enemy.color);
 enemy.points.forEach(p=>foods.push({x:p.x,y:p.y}));
 }else{
@@ -210,22 +200,35 @@ playerDeath();
 function playerDeath(){
 gameOver=true;
 player.alive=false;
-createExplosion(player.points[0].x,
+explosion(player.points[0].x,
 player.points[0].y,player.color);
+
 if(player.length>highscore){
 highscore=Math.floor(player.length);
-localStorage.setItem("snakeHigh",highscore);
+localStorage.setItem("eliteHigh",highscore);
 }
-document.getElementById("finalScore").innerText=
+
+document.getElementById("score").innerText=
 "Score: "+Math.floor(player.length);
 document.getElementById("menu").style.display="block";
 }
 
+function leaderboard(){
+let all=[player,...enemies];
+all.sort((a,b)=>b.length-a.length);
+let text="<b>Leaderboard</b><br>";
+all.slice(0,5).forEach((s,i)=>{
+text+=(i+1)+". "+s.name+" ("+Math.floor(s.length)+")<br>";
+});
+document.getElementById("leaderboard").innerHTML=text;
+}
+
 function update(){
-ctx.fillStyle="#040814";
+ctx.fillStyle="#050816";
 ctx.fillRect(0,0,canvas.width,canvas.height);
 
 if(!gameOver){
+
 let camX=player.points[0].x-canvas.width/2;
 let camY=player.points[0].y-canvas.height/2;
 ctx.save();
@@ -236,21 +239,22 @@ if(player.magnet){
 let dx=player.points[0].x-f.x;
 let dy=player.points[0].y-f.y;
 let dist=Math.hypot(dx,dy);
-if(dist<200){
+if(dist<250){
 f.x+=dx*0.05;
 f.y+=dy*0.05;
 }
 }
+
 ctx.fillStyle=f.rare?"#facc15":"#fde047";
 ctx.beginPath();
-ctx.arc(f.x,f.y,f.rare?10:6,0,Math.PI*2);
+ctx.arc(f.x,f.y,f.rare?12:6,0,Math.PI*2);
 ctx.fill();
 
 let dx=player.points[0].x-f.x;
 let dy=player.points[0].y-f.y;
 if(Math.hypot(dx,dy)<15){
 foods.splice(i,1);
-player.length+=f.rare?120:20;
+player.length+=f.rare?150:25;
 spawnFood();
 }
 });
@@ -263,6 +267,7 @@ player.draw();
 enemies.forEach(e=>e.draw());
 
 ctx.restore();
+leaderboard();
 }
 
 particles.forEach((p,i)=>{
@@ -276,7 +281,7 @@ ctx.fill();
 if(p.life<=0)particles.splice(i,1);
 });
 
-document.getElementById("boostBar").innerText=
+document.getElementById("boost").innerText=
 Math.floor(player.stamina);
 
 requestAnimationFrame(update);
