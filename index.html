@@ -2,15 +2,14 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Ultra Elite Snake</title>
+<title>ULTRA ELITE SNAKE</title>
 <style>
-body{margin:0;overflow:hidden;background:#050510;font-family:Arial}
+body{margin:0;overflow:hidden;background:#070712;font-family:Arial;color:white}
 canvas{display:block}
-#ui{
+#hud{
 position:fixed;
 top:10px;
 left:10px;
-color:white;
 z-index:10;
 }
 #menu{
@@ -19,15 +18,14 @@ top:50%;
 left:50%;
 transform:translate(-50%,-50%);
 background:#111;
-padding:30px;
+padding:40px;
 border-radius:15px;
-text-align:center;
-color:white;
 display:none;
+text-align:center;
 }
 button{
 padding:10px 20px;
-margin:10px;
+margin-top:15px;
 border:none;
 border-radius:8px;
 background:#00ffaa;
@@ -38,13 +36,14 @@ cursor:pointer;
 </head>
 <body>
 
-<div id="ui">
+<div id="hud">
 Score: <span id="score">0</span><br>
+High Score: <span id="high">0</span><br>
 Stamina: <span id="stamina">100</span>
 </div>
 
 <div id="menu">
-<h2>Game Over</h2>
+<h2>YOU DIED</h2>
 <button onclick="restart()">Restart</button>
 </div>
 
@@ -56,12 +55,15 @@ const ctx=canvas.getContext("2d");
 canvas.width=window.innerWidth;
 canvas.height=window.innerHeight;
 
-let worldSize=4000;
+let worldSize=5000;
 let foods=[];
 let enemies=[];
 let particles=[];
+let bgParticles=[];
 let score=0;
 let gameOver=false;
+let highScore=localStorage.getItem("ultraHigh")||0;
+document.getElementById("high").innerText=highScore;
 
 class Snake{
 constructor(x,y,color,isAI=false){
@@ -77,23 +79,24 @@ this.boost=false;
 this.stamina=100;
 this.isAI=isAI;
 this.alive=true;
+this.magnet=0;
 }
 
 update(){
 if(!this.alive)return;
 
-let angleDiff=this.targetAngle-this.angle;
-angleDiff=Math.atan2(Math.sin(angleDiff),Math.cos(angleDiff));
-this.angle+=angleDiff*this.turnSpeed;
+let diff=this.targetAngle-this.angle;
+diff=Math.atan2(Math.sin(diff),Math.cos(diff));
+this.angle+=diff*this.turnSpeed;
 
-this.speed=this.baseSpeed - this.points.length*0.002;
-if(this.speed<1.2)this.speed=1.2;
+this.speed=this.baseSpeed - this.points.length*0.0015;
+if(this.speed<1.3)this.speed=1.3;
 
 if(this.boost && this.stamina>0){
 this.speed=4;
-this.stamina-=0.5;
+this.stamina-=0.6;
 }else{
-this.stamina+=0.2;
+this.stamina+=0.3;
 }
 if(this.stamina>100)this.stamina=100;
 
@@ -105,11 +108,13 @@ y:this.points[0].y+Math.sin(this.angle)*this.speed
 for(let i=1;i<this.points.length;i++){
 let dx=this.points[i-1].x-this.points[i].x;
 let dy=this.points[i-1].y-this.points[i].y;
-this.points[i].x+=dx*0.25;
-this.points[i].y+=dy*0.25;
+this.points[i].x+=dx*0.3;
+this.points[i].y+=dy*0.3;
 }
 
 if(this.points.length>this.length/3)this.points.pop();
+
+if(this.magnet>0)this.magnet--;
 }
 
 draw(){
@@ -117,31 +122,35 @@ if(!this.alive)return;
 ctx.beginPath();
 ctx.lineJoin="round";
 ctx.lineCap="round";
-ctx.lineWidth=12;
+ctx.lineWidth=14;
 ctx.strokeStyle=this.color;
+ctx.shadowBlur=20;
+ctx.shadowColor=this.color;
 ctx.moveTo(this.points[0].x,this.points[0].y);
 for(let p of this.points){
 ctx.lineTo(p.x,p.y);
 }
 ctx.stroke();
+ctx.shadowBlur=0;
 }
 
 explode(){
-for(let i=0;i<80;i++){
+for(let i=0;i<100;i++){
 particles.push({
 x:this.points[0].x,
 y:this.points[0].y,
-vx:(Math.random()-0.5)*6,
-vy:(Math.random()-0.5)*6,
-life:40,
-size:Math.random()*4+2,
+vx:(Math.random()-0.5)*8,
+vy:(Math.random()-0.5)*8,
+life:50,
+size:Math.random()*5+2,
 color:this.color
 });
 }
-for(let i=0;i<60;i++){
+for(let i=0;i<80;i++){
 foods.push({
-x:this.points[0].x+(Math.random()-0.5)*100,
-y:this.points[0].y+(Math.random()-0.5)*100
+x:this.points[0].x+(Math.random()-0.5)*150,
+y:this.points[0].y+(Math.random()-0.5)*150,
+rare:false
 });
 }
 this.alive=false;
@@ -151,9 +160,10 @@ this.alive=false;
 let player=new Snake(worldSize/2,worldSize/2,"#00ffaa");
 spawnEnemies();
 spawnFood();
+spawnBackground();
 
 function spawnEnemies(){
-for(let i=0;i<5;i++){
+for(let i=0;i<6;i++){
 enemies.push(new Snake(
 Math.random()*worldSize,
 Math.random()*worldSize,
@@ -164,20 +174,30 @@ true
 }
 
 function spawnFood(){
-for(let i=0;i<300;i++){
+for(let i=0;i<400;i++){
 foods.push({
 x:Math.random()*worldSize,
-y:Math.random()*worldSize
+y:Math.random()*worldSize,
+rare:Math.random()<0.05
+});
+}
+}
+
+function spawnBackground(){
+for(let i=0;i<150;i++){
+bgParticles.push({
+x:Math.random()*canvas.width,
+y:Math.random()*canvas.height,
+r:Math.random()*2,
+speed:Math.random()*0.5+0.2
 });
 }
 }
 
 canvas.addEventListener("mousemove",e=>{
-let mx=e.clientX;
-let my=e.clientY;
 player.targetAngle=Math.atan2(
-my-canvas.height/2,
-mx-canvas.width/2
+e.clientY-canvas.height/2,
+e.clientX-canvas.width/2
 );
 });
 
@@ -196,64 +216,58 @@ let dx=player.points[0].x-e.points[0].x;
 let dy=player.points[0].y-e.points[0].y;
 let dist=Math.hypot(dx,dy);
 
-if(dist<400){
+if(dist<600){
 e.targetAngle=Math.atan2(dy,dx);
 }else{
-e.targetAngle+= (Math.random()-0.5)*0.2;
+e.targetAngle+=(Math.random()-0.5)*0.2;
 }
-
 e.update();
 });
 
-// collisions
-checkCollisions(player,enemies);
-checkCollisionsEnemies();
-
+handleCollisions();
 eatFood();
-
 updateParticles();
 }
 
-function checkCollisions(p,enemies){
-for(let e of enemies){
-if(!e.alive)continue;
+function handleCollisions(){
+enemies.forEach(e=>{
+if(!e.alive)return;
 
+// player hits enemy body
 for(let i=5;i<e.points.length;i++){
-let dx=p.points[0].x-e.points[i].x;
-let dy=p.points[0].y-e.points[i].y;
-if(Math.hypot(dx,dy)<10){
-p.explode();
+if(distance(player.points[0],e.points[i])<10){
+player.explode();
 endGame();
-return;
-}
-}
 }
 }
 
-function checkCollisionsEnemies(){
-for(let e of enemies){
-if(!e.alive)continue;
-
+// enemy hits player body
 for(let i=5;i<player.points.length;i++){
-let dx=e.points[0].x-player.points[i].x;
-let dy=e.points[0].y-player.points[i].y;
-if(Math.hypot(dx,dy)<10){
+if(distance(e.points[0],player.points[i])<10){
 e.explode();
-player.length+=150;
-score+=20;
+player.length+=200;
+score+=50;
 }
 }
-}
+});
 }
 
 function eatFood(){
-foods.forEach((f,index)=>{
-let dx=player.points[0].x-f.x;
-let dy=player.points[0].y-f.y;
-if(Math.hypot(dx,dy)<15){
-foods.splice(index,1);
-player.length+=20;
-score+=5;
+foods.forEach((f,i)=>{
+let d=distance(player.points[0],f);
+let magnetRange=player.magnet>0?200:20;
+
+if(d<magnetRange){
+if(player.magnet>0){
+f.x+=(player.points[0].x-f.x)*0.2;
+f.y+=(player.points[0].y-f.y)*0.2;
+}
+if(d<15){
+foods.splice(i,1);
+player.length+=f.rare?80:20;
+score+=f.rare?40:10;
+if(f.rare)player.magnet=300;
+}
 }
 });
 }
@@ -270,37 +284,34 @@ if(p.life<=0)particles.splice(i,1);
 function draw(){
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
+// background
+bgParticles.forEach(p=>{
+ctx.fillStyle="rgba(255,255,255,0.1)";
+ctx.beginPath();
+ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+ctx.fill();
+p.y+=p.speed;
+if(p.y>canvas.height)p.y=0;
+});
+
 let camX=player.points[0].x-canvas.width/2;
 let camY=player.points[0].y-canvas.height/2;
 
 ctx.save();
 ctx.translate(-camX,-camY);
 
-// background grid
-ctx.strokeStyle="rgba(255,255,255,0.05)";
-for(let i=0;i<worldSize;i+=100){
-ctx.beginPath();
-ctx.moveTo(i,0);
-ctx.lineTo(i,worldSize);
-ctx.stroke();
-ctx.beginPath();
-ctx.moveTo(0,i);
-ctx.lineTo(worldSize,i);
-ctx.stroke();
-}
-
 // food
-ctx.fillStyle="#ffcc00";
 foods.forEach(f=>{
+ctx.fillStyle=f.rare?"#ff00ff":"#ffaa00";
 ctx.beginPath();
-ctx.arc(f.x,f.y,4,0,Math.PI*2);
+ctx.arc(f.x,f.y,f.rare?6:4,0,Math.PI*2);
 ctx.fill();
 });
 
 // particles
 particles.forEach(p=>{
 ctx.fillStyle=p.color;
-ctx.globalAlpha=p.life/40;
+ctx.globalAlpha=p.life/50;
 ctx.beginPath();
 ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
 ctx.fill();
@@ -316,8 +327,16 @@ document.getElementById("score").innerText=score;
 document.getElementById("stamina").innerText=Math.floor(player.stamina);
 }
 
+function distance(a,b){
+return Math.hypot(a.x-b.x,a.y-b.y);
+}
+
 function endGame(){
 gameOver=true;
+if(score>highScore){
+highScore=score;
+localStorage.setItem("ultraHigh",highScore);
+}
 document.getElementById("menu").style.display="block";
 }
 
@@ -325,13 +344,13 @@ function restart(){
 location.reload();
 }
 
-function gameLoop(){
+function loop(){
 update();
 draw();
-requestAnimationFrame(gameLoop);
+requestAnimationFrame(loop);
 }
 
-gameLoop();
+loop();
 </script>
 </body>
 </html>
