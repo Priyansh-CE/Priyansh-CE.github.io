@@ -4,15 +4,44 @@
 <meta charset="UTF-8">
 <title>Snake Arena Pro</title>
 <style>
-body{margin:0;overflow:hidden;background:#070d18;}
+body{margin:0;overflow:hidden;background:#050b16;font-family:Arial;}
 canvas{display:block;}
-#ui{position:fixed;top:10px;left:10px;color:white;font-family:Arial;}
+#menu{
+position:fixed;
+top:50%;left:50%;
+transform:translate(-50%,-50%);
+color:white;
+text-align:center;
+display:none;
+}
+button{
+padding:10px 20px;
+margin-top:10px;
+border:none;
+background:#22c55e;
+color:black;
+font-weight:bold;
+cursor:pointer;
+}
+#leaderboard{
+position:fixed;
+top:10px;
+right:10px;
+color:white;
+font-size:14px;
+}
 </style>
 </head>
 <body>
 
 <canvas id="game"></canvas>
-<div id="ui">Move Mouse | Shift Boost</div>
+<div id="leaderboard"></div>
+
+<div id="menu">
+<h1>GAME OVER</h1>
+<p id="finalScore"></p>
+<button onclick="restart()">Restart</button>
+</div>
 
 <script>
 const canvas=document.getElementById("game");
@@ -22,11 +51,8 @@ canvas.height=window.innerHeight;
 
 const WORLD=4000;
 
-let player,enemies=[],foods=[],particles=[];
-let boosting=false;
-
-const eatSound=new Audio("https://actions.google.com/sounds/v1/cartoon/pop.ogg");
-const boomSound=new Audio("https://actions.google.com/sounds/v1/explosions/explosion.ogg");
+let player,enemies=[],foods=[];
+let gameOver=false;
 
 class Snake{
 constructor(x,y,color,isAI=false){
@@ -39,6 +65,7 @@ this.radius=10;
 this.color=color;
 this.isAI=isAI;
 this.alive=true;
+this.name=isAI?"AI-"+Math.floor(Math.random()*100):"YOU";
 
 for(let i=0;i<200;i++)
 this.points.push({x:x-i,y:y});
@@ -47,21 +74,25 @@ this.points.push({x:x-i,y:y});
 update(){
 if(!this.alive)return;
 
+if(this.isAI){
+let dx=player.points[0].x-this.points[0].x;
+let dy=player.points[0].y-this.points[0].y;
+let dist=Math.hypot(dx,dy);
+
+if(dist<600){
+this.targetAngle=Math.atan2(dy,dx);
+}else{
+this.targetAngle+= (Math.random()-0.5)*0.1;
+}
+}
+
 let diff=this.targetAngle-this.angle;
 diff=Math.atan2(Math.sin(diff),Math.cos(diff));
 this.angle+=diff*0.1;
 
-if(this.isAI){
-let dx=player.points[0].x-this.points[0].x;
-let dy=player.points[0].y-this.points[0].y;
-this.targetAngle=Math.atan2(dy,dx);
-}
-
-let sp=boosting&&!this.isAI?4:this.speed;
-
 let head=this.points[0];
-let nx=head.x+Math.cos(this.angle)*sp;
-let ny=head.y+Math.sin(this.angle)*sp;
+let nx=head.x+Math.cos(this.angle)*this.speed;
+let ny=head.y+Math.sin(this.angle)*this.speed;
 
 this.points.unshift({x:nx,y:ny});
 
@@ -91,33 +122,13 @@ ctx.lineTo(this.points[i].x,this.points[i].y);
 ctx.stroke();
 ctx.shadowBlur=0;
 }
-
-explode(){
-this.alive=false;
-boomSound.play();
-
-this.points.forEach(p=>{
-for(let i=0;i<2;i++){
-foods.push({x:p.x,y:p.y});
-}
-});
-
-for(let i=0;i<40;i++){
-particles.push({
-x:this.points[0].x,
-y:this.points[0].y,
-vx:(Math.random()-0.5)*8,
-vy:(Math.random()-0.5)*8,
-life:60
-});
-}
-}
 }
 
 function spawnFood(){
 foods.push({
 x:Math.random()*WORLD,
-y:Math.random()*WORLD
+y:Math.random()*WORLD,
+rare:Math.random()<0.05
 });
 }
 
@@ -125,11 +136,12 @@ function init(){
 player=new Snake(WORLD/2,WORLD/2,"#4ade80");
 enemies=[];
 foods=[];
-particles=[];
+gameOver=false;
+document.getElementById("menu").style.display="none";
 
 for(let i=0;i<300;i++)spawnFood();
 
-for(let i=0;i<6;i++){
+for(let i=0;i<8;i++){
 enemies.push(new Snake(
 Math.random()*WORLD,
 Math.random()*WORLD,
@@ -146,28 +158,50 @@ e.clientX-canvas.width/2
 );
 });
 
-document.addEventListener("keydown",e=>{
-if(e.key==="Shift")boosting=true;
-});
-document.addEventListener("keyup",e=>{
-if(e.key==="Shift")boosting=false;
-});
-
 function checkCollisions(){
 enemies.forEach(enemy=>{
 if(!enemy.alive)return;
 
 let dx=player.points[0].x-enemy.points[0].x;
 let dy=player.points[0].y-enemy.points[0].y;
+
 if(Math.hypot(dx,dy)<15){
-enemy.explode();
+if(player.length>enemy.length){
+enemy.alive=false;
+enemy.points.forEach(p=>{
+foods.push({x:p.x,y:p.y});
+});
+}else{
+playerDeath();
+}
 }
 });
 }
 
+function playerDeath(){
+gameOver=true;
+player.alive=false;
+document.getElementById("finalScore").innerText=
+"Score: "+Math.floor(player.length);
+document.getElementById("menu").style.display="block";
+}
+
+function updateLeaderboard(){
+let all=[player,...enemies];
+all.sort((a,b)=>b.length-a.length);
+
+let text="<b>Leaderboard</b><br>";
+all.slice(0,5).forEach((s,i)=>{
+text+=(i+1)+". "+s.name+" ("+Math.floor(s.length)+")<br>";
+});
+document.getElementById("leaderboard").innerHTML=text;
+}
+
 function update(){
-ctx.fillStyle="#070d18";
+ctx.fillStyle="#050b16";
 ctx.fillRect(0,0,canvas.width,canvas.height);
+
+if(!gameOver){
 
 let camX=player.points[0].x-canvas.width/2;
 let camY=player.points[0].y-canvas.height/2;
@@ -176,17 +210,16 @@ ctx.save();
 ctx.translate(-camX,-camY);
 
 foods.forEach((f,i)=>{
-ctx.fillStyle="#fde047";
+ctx.fillStyle=f.rare?"#facc15":"#fde047";
 ctx.beginPath();
-ctx.arc(f.x,f.y,6,0,Math.PI*2);
+ctx.arc(f.x,f.y,f.rare?10:6,0,Math.PI*2);
 ctx.fill();
 
 let dx=player.points[0].x-f.x;
 let dy=player.points[0].y-f.y;
 if(Math.hypot(dx,dy)<15){
 foods.splice(i,1);
-player.length+=20;
-eatSound.play();
+player.length+=f.rare?100:20;
 spawnFood();
 }
 });
@@ -198,20 +231,15 @@ checkCollisions();
 player.draw();
 enemies.forEach(e=>e.draw());
 
-particles.forEach((p,i)=>{
-p.x+=p.vx;
-p.y+=p.vy;
-p.life--;
-ctx.fillStyle="orange";
-ctx.beginPath();
-ctx.arc(p.x,p.y,3,0,Math.PI*2);
-ctx.fill();
-if(p.life<=0)particles.splice(i,1);
-});
-
 ctx.restore();
+updateLeaderboard();
+}
 
 requestAnimationFrame(update);
+}
+
+function restart(){
+init();
 }
 
 init();
