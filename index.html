@@ -2,36 +2,20 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ULTRA FINAL FORM</title>
+<title>ULTRA SMART AI SNAKE</title>
 <style>
 body{margin:0;overflow:hidden;background:#060612;font-family:Arial;color:white}
 canvas{display:block}
-#hud{
-position:fixed;
-top:10px;
-left:10px;
-z-index:10;
-}
+#hud{position:fixed;top:10px;left:10px;z-index:10}
 #menu{
-position:fixed;
-top:50%;
-left:50%;
+position:fixed;top:50%;left:50%;
 transform:translate(-50%,-50%);
-background:#111;
-padding:40px;
-border-radius:15px;
-display:none;
-text-align:center;
-}
+background:#111;padding:40px;
+border-radius:15px;display:none;text-align:center}
 button{
-padding:10px 20px;
-margin-top:15px;
-border:none;
-border-radius:8px;
-background:#00ffaa;
-font-weight:bold;
-cursor:pointer;
-}
+padding:10px 20px;margin-top:15px;
+border:none;border-radius:8px;
+background:#00ffaa;font-weight:bold;cursor:pointer}
 </style>
 </head>
 <body>
@@ -39,7 +23,6 @@ cursor:pointer;
 <div id="hud">
 Score: <span id="score">0</span><br>
 High: <span id="high">0</span><br>
-Combo: <span id="combo">0</span><br>
 Stamina: <span id="stamina">100</span>
 </div>
 
@@ -53,19 +36,19 @@ Stamina: <span id="stamina">100</span>
 <script>
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
-canvas.width=window.innerWidth;
-canvas.height=window.innerHeight;
+canvas.width=innerWidth;
+canvas.height=innerHeight;
 
-let worldSize=7000;
-let foods=[], enemies=[], particles=[], bg=[];
-let score=0, combo=0, gameOver=false;
-let highScore=localStorage.getItem("finalHigh")||0;
+const worldSize=6000;
+let foods=[], enemies=[], particles=[];
+let score=0, gameOver=false;
+let highScore=localStorage.getItem("ultraHigh")||0;
 document.getElementById("high").innerText=highScore;
 
 class Snake{
 constructor(x,y,color,isAI=false,isBoss=false){
 this.points=[{x,y}];
-this.length=isBoss?1000:250;
+this.length=isBoss?900:250;
 this.color=color;
 this.angle=0;
 this.targetAngle=0;
@@ -76,8 +59,8 @@ this.boost=false;
 this.stamina=100;
 this.isAI=isAI;
 this.isBoss=isBoss;
+this.aiType=null;
 this.alive=true;
-this.magnet=0;
 }
 
 update(){
@@ -111,10 +94,9 @@ this.points[i].y+=dy*0.3;
 }
 
 if(this.points.length>this.length/4)this.points.pop();
-if(this.magnet>0)this.magnet--;
 }
 
-draw(){
+draw(camX,camY){
 if(!this.alive)return;
 ctx.beginPath();
 ctx.lineJoin="round";
@@ -123,30 +105,24 @@ ctx.lineWidth=this.isBoss?22:16;
 ctx.strokeStyle=this.color;
 ctx.shadowBlur=20;
 ctx.shadowColor=this.color;
-ctx.moveTo(this.points[0].x,this.points[0].y);
-for(let p of this.points) ctx.lineTo(p.x,p.y);
+ctx.moveTo(this.points[0].x-camX,this.points[0].y-camY);
+for(let p of this.points)
+ctx.lineTo(p.x-camX,p.y-camY);
 ctx.stroke();
 ctx.shadowBlur=0;
-
-if(this.length>1500 && !this.isAI){
-ctx.fillStyle="gold";
-ctx.fillText("👑",this.points[0].x-10,this.points[0].y-25);
-}
 }
 
 explode(){
-for(let i=0;i<120;i++){
+for(let i=0;i<100;i++){
 particles.push({
 x:this.points[0].x,
 y:this.points[0].y,
-vx:(Math.random()-0.5)*10,
-vy:(Math.random()-0.5)*10,
+vx:(Math.random()-0.5)*8,
+vy:(Math.random()-0.5)*8,
 life:60,
-size:Math.random()*6+2,
+size:Math.random()*5+2,
 color:this.color
 });
-}
-for(let i=0;i<120;i++){
 foods.push({
 x:this.points[0].x+(Math.random()-0.5)*200,
 y:this.points[0].y+(Math.random()-0.5)*200,
@@ -159,47 +135,32 @@ this.alive=false;
 
 let player=new Snake(worldSize/2,worldSize/2,"#00ffaa");
 spawnEnemies();
-spawnBoss();
 spawnFood();
-spawnBG();
 
 function spawnEnemies(){
-for(let i=0;i<6;i++){
-enemies.push(new Snake(
+const types=["hunter","coward","smart"];
+for(let i=0;i<8;i++){
+let type=types[Math.floor(Math.random()*types.length)];
+let e=new Snake(
 Math.random()*worldSize,
 Math.random()*worldSize,
 `hsl(${Math.random()*360},80%,60%)`,
 true
-));
+);
+e.aiType=type;
+enemies.push(e);
 }
-}
-
-function spawnBoss(){
-enemies.push(new Snake(
+enemies.push(new Snake(Math.random()*worldSize,
 Math.random()*worldSize,
-Math.random()*worldSize,
-"#ff0000",
-true,true
-));
+"#ff0000",true,true));
 }
 
 function spawnFood(){
-for(let i=0;i<600;i++){
+for(let i=0;i<500;i++){
 foods.push({
 x:Math.random()*worldSize,
 y:Math.random()*worldSize,
 rare:Math.random()<0.05
-});
-}
-}
-
-function spawnBG(){
-for(let i=0;i<200;i++){
-bg.push({
-x:Math.random()*canvas.width,
-y:Math.random()*canvas.height,
-r:Math.random()*2,
-speed:Math.random()*0.5+0.2
 });
 }
 }
@@ -215,7 +176,6 @@ window.addEventListener("mouseup",()=>player.boost=false);
 
 function update(){
 if(gameOver)return;
-
 player.update();
 
 enemies.forEach(e=>{
@@ -225,11 +185,31 @@ let dx=player.points[0].x-e.points[0].x;
 let dy=player.points[0].y-e.points[0].y;
 let dist=Math.hypot(dx,dy);
 
-if(dist<800){
+// Hunter
+if(e.aiType==="hunter"){
 e.targetAngle=Math.atan2(dy,dx);
-}else{
-e.targetAngle+=(Math.random()-0.5)*0.2;
+if(dist<600)e.boost=true;
+else e.boost=false;
 }
+
+// Coward
+if(e.aiType==="coward"){
+if(dist<500){
+e.targetAngle=Math.atan2(-dy,-dx);
+}else wander(e);
+}
+
+// Smart
+if(e.aiType==="smart"){
+if(dist<700){
+if(player.points.length>e.points.length)
+e.targetAngle=Math.atan2(-dy,-dx);
+else
+e.targetAngle=Math.atan2(dy,dx);
+}else wander(e);
+}
+
+avoidCollision(e);
 e.update();
 });
 
@@ -238,25 +218,38 @@ eatFood();
 updateParticles();
 }
 
+function wander(e){
+e.targetAngle+=(Math.random()-0.5)*0.3;
+}
+
+function avoidCollision(e){
+let head=e.points[0];
+
+for(let i=5;i<player.points.length;i++){
+if(distance(head,player.points[i])<50){
+let dx=head.x-player.points[i].x;
+let dy=head.y-player.points[i].y;
+e.targetAngle=Math.atan2(dy,dx);
+}
+}
+}
+
 function collisions(){
 enemies.forEach(e=>{
 if(!e.alive)return;
 
-// player hits enemy body
 for(let i=5;i<e.points.length;i++){
-if(distance(player.points[0],e.points[i])<10){
+if(distance(player.points[0],e.points[i])<12){
 player.explode();
 endGame();
 }
 }
 
-// enemy hits player body
 for(let i=5;i<player.points.length;i++){
-if(distance(e.points[0],player.points[i])<10){
+if(distance(e.points[0],player.points[i])<12){
 e.explode();
 player.length+=300;
 score+=100;
-combo++;
 }
 }
 });
@@ -264,20 +257,10 @@ combo++;
 
 function eatFood(){
 foods.forEach((f,i)=>{
-let d=distance(player.points[0],f);
-let range=player.magnet>0?200:20;
-
-if(d<range){
-if(player.magnet>0){
-f.x+=(player.points[0].x-f.x)*0.2;
-f.y+=(player.points[0].y-f.y)*0.2;
-}
-if(d<15){
+if(distance(player.points[0],f)<20){
 foods.splice(i,1);
 player.length+=f.rare?100:30;
 score+=f.rare?50:10;
-if(f.rare)player.magnet=400;
-}
 }
 });
 }
@@ -294,17 +277,6 @@ if(p.life<=0)particles.splice(i,1);
 function draw(){
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
-// moving background
-bg.forEach(p=>{
-ctx.fillStyle="rgba(255,255,255,0.1)";
-ctx.beginPath();
-ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-ctx.fill();
-p.y+=p.speed;
-if(p.y>canvas.height)p.y=0;
-});
-
-// dynamic zoom
 let zoom=1+(player.length/2500);
 ctx.save();
 ctx.scale(1/zoom,1/zoom);
@@ -313,7 +285,6 @@ let camX=player.points[0].x-canvas.width/2*zoom;
 let camY=player.points[0].y-canvas.height/2*zoom;
 ctx.translate(-camX,-camY);
 
-// food
 foods.forEach(f=>{
 ctx.fillStyle=f.rare?"#ff00ff":"#ffaa00";
 ctx.beginPath();
@@ -321,7 +292,6 @@ ctx.arc(f.x,f.y,f.rare?6:4,0,Math.PI*2);
 ctx.fill();
 });
 
-// particles
 particles.forEach(p=>{
 ctx.fillStyle=p.color;
 ctx.globalAlpha=p.life/60;
@@ -331,13 +301,12 @@ ctx.fill();
 ctx.globalAlpha=1;
 });
 
-player.draw();
-enemies.forEach(e=>e.draw());
+player.draw(camX,camY);
+enemies.forEach(e=>e.draw(camX,camY));
 
 ctx.restore();
 
 document.getElementById("score").innerText=score;
-document.getElementById("combo").innerText=combo;
 document.getElementById("stamina").innerText=Math.floor(player.stamina);
 }
 
@@ -349,14 +318,12 @@ function endGame(){
 gameOver=true;
 if(score>highScore){
 highScore=score;
-localStorage.setItem("finalHigh",highScore);
+localStorage.setItem("ultraHigh",highScore);
 }
 document.getElementById("menu").style.display="block";
 }
 
-function restart(){
-location.reload();
-}
+function restart(){location.reload();}
 
 function loop(){
 update();
