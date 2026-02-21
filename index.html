@@ -2,49 +2,29 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Snake Arena – Neon Pro</title>
+<title>Neon Worm Arena</title>
 <style>
 body{
 margin:0;
 overflow:hidden;
-background:#020617;
+background:#0a0f1f;
 font-family:Arial;
 }
-#ui{
+#scoreUI{
 position:fixed;
 top:15px;
 left:50%;
 transform:translateX(-50%);
 color:white;
+font-size:20px;
 font-weight:bold;
-text-align:center;
-}
-button{
-padding:8px 16px;
-margin:5px;
-border:none;
-border-radius:8px;
-background:linear-gradient(45deg,#00f0ff,#ff00f0);
-color:white;
-font-weight:bold;
-cursor:pointer;
-box-shadow:0 0 10px #00f0ff;
-}
-#score{
-font-size:18px;
 }
 </style>
 </head>
 <body>
 
 <canvas id="game"></canvas>
-
-<div id="ui">
-<div id="score">Score: 0</div>
-<button onclick="startGame()">Start</button>
-<button onclick="pauseGame()">Pause</button>
-<button onclick="restartGame()">Restart</button>
-</div>
+<div id="scoreUI">Score: 0</div>
 
 <script>
 const canvas=document.getElementById("game");
@@ -52,157 +32,146 @@ const ctx=canvas.getContext("2d");
 canvas.width=window.innerWidth;
 canvas.height=window.innerHeight;
 
-let keys={};
-let gameRunning=false;
-let gamePaused=false;
-let hueShift=0;
+let mouse={x:0,y:0};
+let boosting=false;
+let score=0;
 
 let camera={x:0,y:0,zoom:1};
 
-class Snake{
-constructor(x,y){
+class Worm{
+constructor(x,y,color){
 this.x=x;
 this.y=y;
-this.body=[];
-this.mass=60;
+this.segments=[];
+this.segmentSize=16;
+this.length=30;
+this.speed=120;
+this.color=color;
 this.angle=0;
-this.targetAngle=0;
-this.speed=150;
-this.alive=true;
 
-for(let i=0;i<this.mass;i++){
-this.body.push({x,y});
+for(let i=0;i<this.length;i++){
+this.segments.push({x,y});
 }
-}
-
-get radius(){
-return 10+this.mass*0.05;
 }
 
 update(dt){
-if(!this.alive||gamePaused) return;
+let dx=mouse.x-canvas.width/2;
+let dy=mouse.y-canvas.height/2;
+let targetAngle=Math.atan2(dy,dx);
 
-if(keys["ArrowLeft"]) this.targetAngle-=2.5*dt;
-if(keys["ArrowRight"]) this.targetAngle+=2.5*dt;
+this.angle+= (targetAngle-this.angle)*0.08;
 
-this.angle += (this.targetAngle-this.angle)*0.15;
-
-let currentSpeed=this.speed/(1+this.mass*0.01);
-if(keys[" "]){
-currentSpeed*=1.8;
-}
+let currentSpeed=this.speed;
+if(boosting) currentSpeed*=1.8;
 
 this.x+=Math.cos(this.angle)*currentSpeed*dt;
 this.y+=Math.sin(this.angle)*currentSpeed*dt;
 
-this.body.unshift({x:this.x,y:this.y});
-while(this.body.length>this.mass){
-this.body.pop();
+this.segments.unshift({x:this.x,y:this.y});
+while(this.segments.length>this.length){
+this.segments.pop();
 }
 }
 
 draw(){
-if(!this.alive) return;
+for(let i=this.segments.length-1;i>=0;i--){
+let seg=this.segments[i];
 
-ctx.lineCap="round";
-ctx.lineJoin="round";
+let gradient=ctx.createRadialGradient(
+seg.x,seg.y,2,
+seg.x,seg.y,this.segmentSize
+);
 
-for(let i=this.body.length-1;i>0;i--){
-let p1=this.body[i];
-let p2=this.body[i-1];
+gradient.addColorStop(0,"white");
+gradient.addColorStop(1,this.color);
 
-let gradient=ctx.createLinearGradient(p1.x,p1.y,p2.x,p2.y);
-gradient.addColorStop(0,`hsl(${(hueShift+i*2)%360},100%,60%)`);
-gradient.addColorStop(1,`hsl(${(hueShift+i*2+40)%360},100%,50%)`);
-
-ctx.strokeStyle=gradient;
-ctx.lineWidth=this.radius*(i/this.body.length);
-
-ctx.shadowBlur=20;
-ctx.shadowColor=`hsl(${(hueShift+i*2)%360},100%,60%)`;
-
+ctx.fillStyle=gradient;
 ctx.beginPath();
-ctx.moveTo(p1.x,p1.y);
-ctx.lineTo(p2.x,p2.y);
-ctx.stroke();
+ctx.arc(seg.x,seg.y,this.segmentSize,0,Math.PI*2);
+ctx.fill();
 }
 
-ctx.shadowBlur=30;
-ctx.shadowColor=`hsl(${hueShift%360},100%,60%)`;
+this.drawEyes();
+}
+
+drawEyes(){
+let head=this.segments[0];
+let eyeOffset=6;
+
+ctx.fillStyle="white";
 ctx.beginPath();
-ctx.arc(this.x,this.y,this.radius,0,Math.PI*2);
-ctx.fillStyle=`hsl(${hueShift%360},100%,50%)`;
+ctx.arc(head.x+Math.cos(this.angle+0.4)*eyeOffset,
+head.y+Math.sin(this.angle+0.4)*eyeOffset,5,0,Math.PI*2);
 ctx.fill();
 
-ctx.shadowBlur=0;
+ctx.beginPath();
+ctx.arc(head.x+Math.cos(this.angle-0.4)*eyeOffset,
+head.y+Math.sin(this.angle-0.4)*eyeOffset,5,0,Math.PI*2);
+ctx.fill();
+
+ctx.fillStyle="black";
+ctx.beginPath();
+ctx.arc(head.x+Math.cos(this.angle+0.4)*eyeOffset,
+head.y+Math.sin(this.angle+0.4)*eyeOffset,2,0,Math.PI*2);
+ctx.fill();
+
+ctx.beginPath();
+ctx.arc(head.x+Math.cos(this.angle-0.4)*eyeOffset,
+head.y+Math.sin(this.angle-0.4)*eyeOffset,2,0,Math.PI*2);
+ctx.fill();
 }
 }
 
 class Food{
 constructor(){
-this.x=(Math.random()-0.5)*2000;
-this.y=(Math.random()-0.5)*2000;
-this.radius=6+Math.random()*4;
+this.x=(Math.random()-0.5)*3000;
+this.y=(Math.random()-0.5)*3000;
+this.size=8;
 this.hue=Math.random()*360;
 this.pulse=0;
 }
 
-draw(){
+update(){
 this.pulse+=0.05;
-let size=this.radius+Math.sin(this.pulse)*1.5;
+}
 
-ctx.shadowBlur=20;
+draw(){
+let radius=this.size+Math.sin(this.pulse)*2;
+
+ctx.shadowBlur=15;
 ctx.shadowColor=`hsl(${this.hue},100%,60%)`;
 ctx.fillStyle=`hsl(${this.hue},100%,50%)`;
+
 ctx.beginPath();
-ctx.arc(this.x,this.y,size,0,Math.PI*2);
+ctx.arc(this.x,this.y,radius,0,Math.PI*2);
 ctx.fill();
+
 ctx.shadowBlur=0;
 }
 }
 
-let player;
+let worm=new Worm(0,0,"#00f0ff");
 let foods=[];
-
-function init(){
-player=new Snake(0,0);
-foods=[];
 for(let i=0;i<200;i++){
 foods.push(new Food());
 }
-document.getElementById("score").innerText="Score: 0";
-}
-
-function startGame(){
-gameRunning=true;
-gamePaused=false;
-}
-
-function pauseGame(){
-gamePaused=!gamePaused;
-}
-
-function restartGame(){
-init();
-gameRunning=true;
-gamePaused=false;
-}
 
 function updateCamera(){
-camera.x+=(player.x-camera.x)*0.1;
-camera.y+=(player.y-camera.y)*0.1;
-camera.zoom=1/(1+player.mass*0.002);
+camera.x+=(worm.x-camera.x)*0.08;
+camera.y+=(worm.y-camera.y)*0.08;
+camera.zoom=1/(1+worm.length*0.01);
 }
 
 function checkFood(){
 foods.forEach((f,i)=>{
-let dx=player.x-f.x;
-let dy=player.y-f.y;
-if(Math.sqrt(dx*dx+dy*dy)<player.radius){
-player.mass+=5;
+let dx=worm.x-f.x;
+let dy=worm.y-f.y;
+if(Math.sqrt(dx*dx+dy*dy)<worm.segmentSize){
+worm.length+=2;
+score+=10;
+document.getElementById("scoreUI").innerText="Score: "+score;
 foods.splice(i,1);
 foods.push(new Food());
-document.getElementById("score").innerText="Score: "+player.mass;
 }
 });
 }
@@ -214,9 +183,6 @@ last=t;
 
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
-if(gameRunning){
-hueShift+=60*dt;
-
 updateCamera();
 
 ctx.save();
@@ -224,23 +190,29 @@ ctx.translate(canvas.width/2,canvas.height/2);
 ctx.scale(camera.zoom,camera.zoom);
 ctx.translate(-camera.x,-camera.y);
 
-foods.forEach(f=>f.draw());
+foods.forEach(f=>{
+f.update();
+f.draw();
+});
 
-player.update(dt);
+worm.update(dt);
 checkFood();
-player.draw();
+worm.draw();
 
 ctx.restore();
-}
 
 requestAnimationFrame(loop);
 }
 
-init();
-requestAnimationFrame(loop);
+canvas.addEventListener("mousemove",e=>{
+mouse.x=e.clientX;
+mouse.y=e.clientY;
+});
 
-window.addEventListener("keydown",e=>keys[e.key]=true);
-window.addEventListener("keyup",e=>keys[e.key]=false);
+canvas.addEventListener("mousedown",()=>boosting=true);
+canvas.addEventListener("mouseup",()=>boosting=false);
+
+requestAnimationFrame(loop);
 </script>
 </body>
 </html>
