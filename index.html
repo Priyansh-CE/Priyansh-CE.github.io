@@ -1,253 +1,148 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Neon Snake Arena</title>
-<style>
-body{
-    margin:0;
-    overflow:hidden;
-    background:#0a0f1f;
-    font-family:Arial;
-}
-canvas{display:block;}
-#ui{
-    position:fixed;
-    top:10px;
-    left:15px;
-    color:white;
-    font-size:18px;
-}
-#menu{
-    position:fixed;
-    top:50%;
-    left:50%;
-    transform:translate(-50%,-50%);
-    text-align:center;
-    display:none;
-}
-button{
-    padding:10px 20px;
-    margin:10px;
-    font-size:16px;
-    border:none;
-    border-radius:8px;
-    cursor:pointer;
-}
-#restart{background:#22c55e;}
-#exit{background:#ef4444;color:white;}
-</style>
-</head>
-<body>
-
-<canvas id="game"></canvas>
-
-<div id="ui">
-Score: <span id="score">0</span> |
-High: <span id="high">0</span>
-</div>
-
-<div id="menu">
-<h2 style="color:white">GAME OVER</h2>
-<button id="restart">Restart</button>
-<button id="exit">Exit</button>
-</div>
-
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let player, enemies=[], foods=[], particles=[];
+let player, foods=[];
 let score=0;
-let highScore = localStorage.getItem("snakeHigh") || 0;
 let gameOver=false;
-let boosting=false;
-
-document.getElementById("high").innerText = highScore;
 
 class Snake{
-    constructor(x,y,color,isAI=false){
-        this.segments=[];
+    constructor(x,y,color){
+        this.points=[];
         this.color=color;
-        this.speed=2;
+        this.speed=2.2;
         this.angle=0;
-        this.isAI=isAI;
-        for(let i=0;i<25;i++){
-            this.segments.push({x:x-i*8,y:y});
+        this.length=300;
+        this.radius=12;
+
+        for(let i=0;i<200;i++){
+            this.points.push({x:x-i,y:y});
         }
     }
 
     update(){
-        if(this.isAI){
-            let target = foods[Math.floor(Math.random()*foods.length)];
-            if(target){
-                this.angle = Math.atan2(target.y-this.segments[0].y,
-                                        target.x-this.segments[0].x);
+        const head = this.points[0];
+        const nx = head.x + Math.cos(this.angle)*this.speed;
+        const ny = head.y + Math.sin(this.angle)*this.speed;
+
+        this.points.unshift({x:nx,y:ny});
+
+        let totalLength=0;
+        for(let i=0;i<this.points.length-1;i++){
+            const dx=this.points[i].x-this.points[i+1].x;
+            const dy=this.points[i].y-this.points[i+1].y;
+            totalLength+=Math.hypot(dx,dy);
+            if(totalLength>this.length){
+                this.points.splice(i+1);
+                break;
             }
-        }
-
-        let currentSpeed = boosting && !this.isAI ? 4 : this.speed;
-
-        let head = this.segments[0];
-        let newX = head.x + Math.cos(this.angle)*currentSpeed;
-        let newY = head.y + Math.sin(this.angle)*currentSpeed;
-
-        this.segments.unshift({x:newX,y:newY});
-        this.segments.pop();
-
-        if(boosting && this.segments.length>20 && !this.isAI){
-            this.segments.pop();
         }
     }
 
-    grow(n){
-        for(let i=0;i<n;i++){
-            this.segments.push({...this.segments[this.segments.length-1]});
-        }
+    grow(amount){
+        this.length+=amount;
     }
 
     draw(){
-        for(let i=this.segments.length-1;i>=0;i--){
-            let s=this.segments[i];
-            let radius=8 + i*0.02;
-            ctx.beginPath();
-            ctx.arc(s.x,s.y,radius,0,Math.PI*2);
-            ctx.fillStyle=this.color;
-            ctx.shadowBlur=15;
-            ctx.shadowColor=this.color;
-            ctx.fill();
+        ctx.lineCap="round";
+        ctx.lineJoin="round";
+        ctx.lineWidth=this.radius*2;
+
+        const gradient=ctx.createLinearGradient(
+            this.points[0].x,
+            this.points[0].y,
+            this.points[30]?.x || this.points[0].x,
+            this.points[30]?.y || this.points[0].y
+        );
+        gradient.addColorStop(0,"#4ade80");
+        gradient.addColorStop(1,"#166534");
+
+        ctx.strokeStyle=gradient;
+        ctx.shadowColor="#22c55e";
+        ctx.shadowBlur=25;
+
+        ctx.beginPath();
+        ctx.moveTo(this.points[0].x,this.points[0].y);
+        for(let i=1;i<this.points.length;i++){
+            ctx.lineTo(this.points[i].x,this.points[i].y);
         }
+        ctx.stroke();
+
         ctx.shadowBlur=0;
+
+        // Head shine
+        ctx.beginPath();
+        ctx.arc(this.points[0].x,this.points[0].y,this.radius+2,0,Math.PI*2);
+        ctx.fillStyle="rgba(255,255,255,0.1)";
+        ctx.fill();
+
+        // Eyes
+        ctx.fillStyle="white";
+        ctx.beginPath();
+        ctx.arc(
+            this.points[0].x+Math.cos(this.angle)*6 - Math.sin(this.angle)*4,
+            this.points[0].y+Math.sin(this.angle)*6 + Math.cos(this.angle)*4,
+            3,0,Math.PI*2);
+        ctx.fill();
     }
 }
 
-function spawnFood(x,y){
-    foods.push({x,y,r:5});
-}
-
-function explodeSnake(snake){
-    snake.segments.forEach(seg=>{
-        for(let i=0;i<3;i++){
-            particles.push({
-                x:seg.x,
-                y:seg.y,
-                dx:(Math.random()-0.5)*4,
-                dy:(Math.random()-0.5)*4,
-                life:60
-            });
-        }
-        spawnFood(seg.x,seg.y);
+function spawnFood(){
+    foods.push({
+        x:Math.random()*canvas.width,
+        y:Math.random()*canvas.height,
+        r:6
     });
 }
 
 function init(){
-    player = new Snake(canvas.width/2,canvas.height/2,"#22c55e");
-    enemies=[
-        new Snake(200,200,"#ef4444",true),
-        new Snake(800,400,"#3b82f6",true)
-    ];
+    player=new Snake(canvas.width/2,canvas.height/2,"#22c55e");
     foods=[];
-    particles=[];
-    for(let i=0;i<150;i++){
-        spawnFood(Math.random()*canvas.width,
-                  Math.random()*canvas.height);
-    }
+    for(let i=0;i<80;i++) spawnFood();
     score=0;
     gameOver=false;
-    document.getElementById("menu").style.display="none";
 }
 
 canvas.addEventListener("mousemove",e=>{
     player.angle=Math.atan2(
-        e.clientY-player.segments[0].y,
-        e.clientX-player.segments[0].x
+        e.clientY-player.points[0].y,
+        e.clientX-player.points[0].x
     );
 });
 
-canvas.addEventListener("mousedown",()=>boosting=true);
-canvas.addEventListener("mouseup",()=>boosting=false);
-
-function checkCollision(){
-    enemies.forEach((enemy,ei)=>{
-        enemy.segments.forEach(seg=>{
-            if(dist(player.segments[0],seg)<8){
-                explodeSnake(player);
-                endGame();
-            }
-        });
-
-        player.segments.forEach(seg=>{
-            if(dist(enemy.segments[0],seg)<8){
-                explodeSnake(enemy);
-                enemies.splice(ei,1);
-            }
-        });
-    });
-}
-
-function endGame(){
-    gameOver=true;
-    if(score>highScore){
-        highScore=score;
-        localStorage.setItem("snakeHigh",highScore);
-    }
-    document.getElementById("high").innerText=highScore;
-    document.getElementById("menu").style.display="block";
-}
-
-function dist(a,b){
-    return Math.hypot(a.x-b.x,a.y-b.y);
-}
-
 function update(){
-    ctx.fillStyle="#0a0f1f";
+    ctx.fillStyle="#0b1220";
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
     if(!gameOver){
         player.update();
         player.draw();
 
-        enemies.forEach(e=>{
-            e.update();
-            e.draw();
-        });
-
         foods.forEach((f,i)=>{
+            const glow=ctx.createRadialGradient(f.x,f.y,1,f.x,f.y,10);
+            glow.addColorStop(0,"#fde047");
+            glow.addColorStop(1,"transparent");
+            ctx.fillStyle=glow;
             ctx.beginPath();
-            ctx.arc(f.x,f.y,f.r,0,Math.PI*2);
-            ctx.fillStyle="#facc15";
+            ctx.arc(f.x,f.y,10,0,Math.PI*2);
             ctx.fill();
 
-            if(dist(player.segments[0],f)<10){
+            const dx=player.points[0].x-f.x;
+            const dy=player.points[0].y-f.y;
+
+            if(Math.hypot(dx,dy)<15){
                 foods.splice(i,1);
-                player.grow(5);
-                score++;
-                document.getElementById("score").innerText=score;
+                player.grow(25);
+                spawnFood();
             }
         });
-
-        checkCollision();
     }
-
-    particles.forEach((p,i)=>{
-        p.x+=p.dx;
-        p.y+=p.dy;
-        p.life--;
-        ctx.fillStyle="orange";
-        ctx.fillRect(p.x,p.y,3,3);
-        if(p.life<=0) particles.splice(i,1);
-    });
 
     requestAnimationFrame(update);
 }
 
-document.getElementById("restart").onclick=init;
-document.getElementById("exit").onclick=()=>location.reload();
-
 init();
 update();
 </script>
-</body>
-</html>
