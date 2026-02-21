@@ -2,16 +2,18 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ULTRA ELITE SNAKE</title>
+<title>ULTRA GOD MODE PHASE 2</title>
 <style>
-body{margin:0;overflow:hidden;background:#070712;font-family:Arial;color:white}
+body{margin:0;overflow:hidden;background:#050510;font-family:Arial;color:white}
 canvas{display:block}
+
 #hud{
 position:fixed;
 top:10px;
 left:10px;
 z-index:10;
 }
+
 #menu{
 position:fixed;
 top:50%;
@@ -20,9 +22,27 @@ transform:translate(-50%,-50%);
 background:#111;
 padding:40px;
 border-radius:15px;
-display:none;
 text-align:center;
+display:none;
 }
+
+#skinSelect{
+position:fixed;
+bottom:10px;
+left:50%;
+transform:translateX(-50%);
+z-index:10;
+}
+
+.skin{
+width:30px;
+height:30px;
+border-radius:50%;
+display:inline-block;
+margin:5px;
+cursor:pointer;
+}
+
 button{
 padding:10px 20px;
 margin-top:15px;
@@ -38,14 +58,16 @@ cursor:pointer;
 
 <div id="hud">
 Score: <span id="score">0</span><br>
-High Score: <span id="high">0</span><br>
-Stamina: <span id="stamina">100</span>
+High: <span id="high">0</span><br>
+Combo: <span id="combo">0</span>
 </div>
 
 <div id="menu">
 <h2>YOU DIED</h2>
 <button onclick="restart()">Restart</button>
 </div>
+
+<div id="skinSelect"></div>
 
 <canvas id="game"></canvas>
 
@@ -55,31 +77,40 @@ const ctx=canvas.getContext("2d");
 canvas.width=window.innerWidth;
 canvas.height=window.innerHeight;
 
-let worldSize=5000;
+let worldSize=6000;
 let foods=[];
 let enemies=[];
 let particles=[];
-let bgParticles=[];
 let score=0;
+let combo=0;
 let gameOver=false;
-let highScore=localStorage.getItem("ultraHigh")||0;
+let highScore=localStorage.getItem("godHigh")||0;
 document.getElementById("high").innerText=highScore;
 
+const skins=["#00ffaa","#ff3b3b","#00aaff","#ff00ff","#ffff00"];
+let selectedSkin=skins[0];
+
+const skinDiv=document.getElementById("skinSelect");
+skins.forEach(color=>{
+let s=document.createElement("div");
+s.className="skin";
+s.style.background=color;
+s.onclick=()=>selectedSkin=color;
+skinDiv.appendChild(s);
+});
+
 class Snake{
-constructor(x,y,color,isAI=false){
+constructor(x,y,color,isAI=false,isBoss=false){
 this.points=[{x,y}];
-this.length=200;
+this.length=isBoss?800:200;
 this.color=color;
 this.angle=0;
 this.targetAngle=0;
 this.turnSpeed=0.08;
-this.baseSpeed=2;
 this.speed=2;
-this.boost=false;
-this.stamina=100;
 this.isAI=isAI;
+this.isBoss=isBoss;
 this.alive=true;
-this.magnet=0;
 }
 
 update(){
@@ -88,17 +119,6 @@ if(!this.alive)return;
 let diff=this.targetAngle-this.angle;
 diff=Math.atan2(Math.sin(diff),Math.cos(diff));
 this.angle+=diff*this.turnSpeed;
-
-this.speed=this.baseSpeed - this.points.length*0.0015;
-if(this.speed<1.3)this.speed=1.3;
-
-if(this.boost && this.stamina>0){
-this.speed=4;
-this.stamina-=0.6;
-}else{
-this.stamina+=0.3;
-}
-if(this.stamina>100)this.stamina=100;
 
 this.points.unshift({
 x:this.points[0].x+Math.cos(this.angle)*this.speed,
@@ -112,17 +132,16 @@ this.points[i].x+=dx*0.3;
 this.points[i].y+=dy*0.3;
 }
 
-if(this.points.length>this.length/3)this.points.pop();
-
-if(this.magnet>0)this.magnet--;
+if(this.points.length>this.length/4)this.points.pop();
 }
 
 draw(){
 if(!this.alive)return;
+
 ctx.beginPath();
 ctx.lineJoin="round";
 ctx.lineCap="round";
-ctx.lineWidth=14;
+ctx.lineWidth=this.isBoss?20:14;
 ctx.strokeStyle=this.color;
 ctx.shadowBlur=20;
 ctx.shadowColor=this.color;
@@ -132,38 +151,43 @@ ctx.lineTo(p.x,p.y);
 }
 ctx.stroke();
 ctx.shadowBlur=0;
+
+// crown for biggest
+if(this.length>1000 && !this.isAI){
+ctx.fillStyle="gold";
+ctx.fillText("👑",this.points[0].x-10,this.points[0].y-20);
+}
 }
 
 explode(){
-for(let i=0;i<100;i++){
+for(let i=0;i<120;i++){
 particles.push({
 x:this.points[0].x,
 y:this.points[0].y,
-vx:(Math.random()-0.5)*8,
-vy:(Math.random()-0.5)*8,
-life:50,
-size:Math.random()*5+2,
+vx:(Math.random()-0.5)*10,
+vy:(Math.random()-0.5)*10,
+life:60,
+size:Math.random()*6+2,
 color:this.color
 });
 }
-for(let i=0;i<80;i++){
+for(let i=0;i<100;i++){
 foods.push({
-x:this.points[0].x+(Math.random()-0.5)*150,
-y:this.points[0].y+(Math.random()-0.5)*150,
-rare:false
+x:this.points[0].x+(Math.random()-0.5)*200,
+y:this.points[0].y+(Math.random()-0.5)*200
 });
 }
 this.alive=false;
 }
 }
 
-let player=new Snake(worldSize/2,worldSize/2,"#00ffaa");
+let player=new Snake(worldSize/2,worldSize/2,selectedSkin);
 spawnEnemies();
 spawnFood();
-spawnBackground();
+spawnBoss();
 
 function spawnEnemies(){
-for(let i=0;i<6;i++){
+for(let i=0;i<5;i++){
 enemies.push(new Snake(
 Math.random()*worldSize,
 Math.random()*worldSize,
@@ -173,23 +197,21 @@ true
 }
 }
 
-function spawnFood(){
-for(let i=0;i<400;i++){
-foods.push({
-x:Math.random()*worldSize,
-y:Math.random()*worldSize,
-rare:Math.random()<0.05
-});
-}
+function spawnBoss(){
+enemies.push(new Snake(
+Math.random()*worldSize,
+Math.random()*worldSize,
+"#ff0000",
+true,
+true
+));
 }
 
-function spawnBackground(){
-for(let i=0;i<150;i++){
-bgParticles.push({
-x:Math.random()*canvas.width,
-y:Math.random()*canvas.height,
-r:Math.random()*2,
-speed:Math.random()*0.5+0.2
+function spawnFood(){
+for(let i=0;i<500;i++){
+foods.push({
+x:Math.random()*worldSize,
+y:Math.random()*worldSize
 });
 }
 }
@@ -201,9 +223,6 @@ e.clientX-canvas.width/2
 );
 });
 
-window.addEventListener("mousedown",()=>player.boost=true);
-window.addEventListener("mouseup",()=>player.boost=false);
-
 function update(){
 if(gameOver)return;
 
@@ -214,26 +233,25 @@ if(!e.alive)return;
 
 let dx=player.points[0].x-e.points[0].x;
 let dy=player.points[0].y-e.points[0].y;
-let dist=Math.hypot(dx,dy);
 
-if(dist<600){
+if(Math.hypot(dx,dy)<800){
 e.targetAngle=Math.atan2(dy,dx);
 }else{
 e.targetAngle+=(Math.random()-0.5)*0.2;
 }
+
 e.update();
 });
 
-handleCollisions();
+collisions();
 eatFood();
 updateParticles();
 }
 
-function handleCollisions(){
+function collisions(){
 enemies.forEach(e=>{
 if(!e.alive)return;
 
-// player hits enemy body
 for(let i=5;i<e.points.length;i++){
 if(distance(player.points[0],e.points[i])<10){
 player.explode();
@@ -241,12 +259,12 @@ endGame();
 }
 }
 
-// enemy hits player body
 for(let i=5;i<player.points.length;i++){
 if(distance(e.points[0],player.points[i])<10){
 e.explode();
-player.length+=200;
-score+=50;
+player.length+=300;
+score+=100;
+combo++;
 }
 }
 });
@@ -254,20 +272,10 @@ score+=50;
 
 function eatFood(){
 foods.forEach((f,i)=>{
-let d=distance(player.points[0],f);
-let magnetRange=player.magnet>0?200:20;
-
-if(d<magnetRange){
-if(player.magnet>0){
-f.x+=(player.points[0].x-f.x)*0.2;
-f.y+=(player.points[0].y-f.y)*0.2;
-}
-if(d<15){
+if(distance(player.points[0],f)<15){
 foods.splice(i,1);
-player.length+=f.rare?80:20;
-score+=f.rare?40:10;
-if(f.rare)player.magnet=300;
-}
+player.length+=30;
+score+=10;
 }
 });
 }
@@ -284,34 +292,27 @@ if(p.life<=0)particles.splice(i,1);
 function draw(){
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
-// background
-bgParticles.forEach(p=>{
-ctx.fillStyle="rgba(255,255,255,0.1)";
-ctx.beginPath();
-ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
-ctx.fill();
-p.y+=p.speed;
-if(p.y>canvas.height)p.y=0;
-});
-
-let camX=player.points[0].x-canvas.width/2;
-let camY=player.points[0].y-canvas.height/2;
-
+// dynamic zoom
+let zoom=1+(player.length/2000);
 ctx.save();
+ctx.scale(1/zoom,1/zoom);
+
+let camX=player.points[0].x-canvas.width/2*zoom;
+let camY=player.points[0].y-canvas.height/2*zoom;
 ctx.translate(-camX,-camY);
 
 // food
+ctx.fillStyle="#ffaa00";
 foods.forEach(f=>{
-ctx.fillStyle=f.rare?"#ff00ff":"#ffaa00";
 ctx.beginPath();
-ctx.arc(f.x,f.y,f.rare?6:4,0,Math.PI*2);
+ctx.arc(f.x,f.y,4,0,Math.PI*2);
 ctx.fill();
 });
 
 // particles
 particles.forEach(p=>{
 ctx.fillStyle=p.color;
-ctx.globalAlpha=p.life/50;
+ctx.globalAlpha=p.life/60;
 ctx.beginPath();
 ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
 ctx.fill();
@@ -324,7 +325,7 @@ enemies.forEach(e=>e.draw());
 ctx.restore();
 
 document.getElementById("score").innerText=score;
-document.getElementById("stamina").innerText=Math.floor(player.stamina);
+document.getElementById("combo").innerText=combo;
 }
 
 function distance(a,b){
@@ -335,7 +336,7 @@ function endGame(){
 gameOver=true;
 if(score>highScore){
 highScore=score;
-localStorage.setItem("ultraHigh",highScore);
+localStorage.setItem("godHigh",highScore);
 }
 document.getElementById("menu").style.display="block";
 }
@@ -349,7 +350,6 @@ update();
 draw();
 requestAnimationFrame(loop);
 }
-
 loop();
 </script>
 </body>
