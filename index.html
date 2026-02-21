@@ -2,42 +2,28 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Snake Arena ULTRA OFFLINE ELITE</title>
+<title>Snake Arena INSANE PRO</title>
 <style>
-body{margin:0;overflow:hidden;background:#050816;font-family:Arial}
+body{margin:0;overflow:hidden;background:#020617}
 canvas{display:block}
-#ui{
-position:fixed;top:10px;left:10px;color:white;font-size:14px}
 #menu{
 position:fixed;top:50%;left:50%;
 transform:translate(-50%,-50%);
 color:white;text-align:center;display:none}
 button{
-padding:10px 20px;margin:10px;
+padding:12px 25px;margin:10px;
 border:none;background:#22c55e;
 color:black;font-weight:bold;cursor:pointer}
-#leaderboard{
-position:fixed;top:10px;right:10px;
-color:white;font-size:14px;text-align:right}
 </style>
 </head>
 <body>
 
 <canvas id="game"></canvas>
 
-<div id="ui">
-Level: <span id="level">1</span><br>
-XP: <span id="xp">0</span><br>
-Boost: <span id="boost">100</span><br>
-Rank: <span id="rank">Bronze</span>
-</div>
-
-<div id="leaderboard"></div>
-
 <div id="menu">
-<h1>GAME OVER</h1>
-<p id="score"></p>
+<h1>YOU DIED</h1>
 <button onclick="restart()">Restart</button>
+<button onclick="location.reload()">Exit</button>
 </div>
 
 <script>
@@ -46,32 +32,23 @@ const ctx=canvas.getContext("2d");
 canvas.width=innerWidth;
 canvas.height=innerHeight;
 
-const WORLD=6000;
-
+const WORLD=5000;
+let shake=0;
 let player,enemies=[],foods=[],particles=[];
 let gameOver=false;
-let shake=0;
-let zoom=1;
-
-let savedXP=parseInt(localStorage.getItem("xp"))||0;
-let savedLevel=parseInt(localStorage.getItem("level"))||1;
 
 class Snake{
-constructor(x,y,color,isAI=false,isBoss=false){
+constructor(x,y,color,isAI=false){
 this.points=[];
 this.angle=0;
 this.targetAngle=0;
-this.speed=isBoss?1.5:2;
-this.baseSpeed=this.speed;
-this.length=isBoss?1500:300;
-this.radius=isBoss?20:10;
+this.speed=2;
+this.baseSpeed=2;
+this.length=300;
 this.color=color;
 this.isAI=isAI;
-this.isBoss=isBoss;
 this.alive=true;
 this.stamina=100;
-this.xp=0;
-this.level=1;
 
 for(let i=0;i<200;i++)
 this.points.push({x:x-i,y:y});
@@ -88,7 +65,7 @@ this.targetAngle=Math.atan2(dy,dx);
 
 let diff=this.targetAngle-this.angle;
 diff=Math.atan2(Math.sin(diff),Math.cos(diff));
-this.angle+=diff*0.08;
+this.angle+=diff*0.1;
 
 let head=this.points[0];
 let nx=head.x+Math.cos(this.angle)*this.speed;
@@ -109,17 +86,35 @@ break;
 
 draw(){
 if(!this.alive)return;
-ctx.lineWidth=this.radius*2;
-ctx.lineCap="round";
-ctx.strokeStyle=this.color;
-ctx.shadowColor=this.color;
-ctx.shadowBlur=this.isBoss?30:15;
+
+let thickness=8+this.length/300;
+
+for(let i=this.points.length-1;i>0;i--){
+let p=this.points[i];
+let ratio=i/this.points.length;
 ctx.beginPath();
-ctx.moveTo(this.points[0].x,this.points[0].y);
-for(let i=1;i<this.points.length;i++)
-ctx.lineTo(this.points[i].x,this.points[i].y);
-ctx.stroke();
-ctx.shadowBlur=0;
+ctx.fillStyle=this.color;
+ctx.globalAlpha=0.6+ratio*0.4;
+ctx.arc(p.x,p.y,thickness*ratio,0,Math.PI*2);
+ctx.fill();
+}
+ctx.globalAlpha=1;
+
+let head=this.points[0];
+
+ctx.fillStyle="white";
+ctx.beginPath();
+ctx.arc(head.x+Math.cos(this.angle)*5,
+head.y+Math.sin(this.angle)*5,
+3,0,Math.PI*2);
+ctx.fill();
+
+ctx.fillStyle="black";
+ctx.beginPath();
+ctx.arc(head.x+Math.cos(this.angle)*7,
+head.y+Math.sin(this.angle)*7,
+1.5,0,Math.PI*2);
+ctx.fill();
 }
 }
 
@@ -127,45 +122,48 @@ function spawnFood(){
 foods.push({
 x:Math.random()*WORLD,
 y:Math.random()*WORLD,
-rare:Math.random()<0.05
+rare:Math.random()<0.05,
+pulse:0
 });
 }
 
 function explosion(x,y,color){
-shake=20;
-for(let i=0;i<40;i++){
+shake=25;
+for(let i=0;i<50;i++){
 particles.push({
 x,y,
-vx:(Math.random()-0.5)*10,
-vy:(Math.random()-0.5)*10,
-life:60,
+vx:(Math.random()-0.5)*12,
+vy:(Math.random()-0.5)*12,
+life:80,
 color});
 }
 }
 
 function init(){
 player=new Snake(WORLD/2,WORLD/2,"#22c55e");
-player.level=savedLevel;
-player.xp=savedXP;
-
 enemies=[];
 foods=[];
 particles=[];
 gameOver=false;
 
-for(let i=0;i<400;i++)spawnFood();
+for(let i=0;i<300;i++)spawnFood();
 
-for(let i=0;i<6;i++)
+for(let i=0;i<5;i++)
 enemies.push(new Snake(Math.random()*WORLD,
 Math.random()*WORLD,"#ef4444",true));
-
-enemies.push(new Snake(1000,1000,"#9333ea",true,true));
 }
 
 canvas.addEventListener("mousemove",e=>{
 player.targetAngle=Math.atan2(
 e.clientY-canvas.height/2,
 e.clientX-canvas.width/2);
+});
+
+canvas.addEventListener("touchmove",e=>{
+let t=e.touches[0];
+player.targetAngle=Math.atan2(
+t.clientY-canvas.height/2,
+t.clientX-canvas.width/2);
 });
 
 document.addEventListener("keydown",e=>{
@@ -178,31 +176,19 @@ if(e.key==="Shift")
 player.speed=player.baseSpeed;
 });
 
-function updateRank(){
-let rank="Bronze";
-if(player.level>5)rank="Silver";
-if(player.level>10)rank="Gold";
-if(player.level>20)rank="Diamond";
-document.getElementById("rank").innerText=rank;
-}
-
 function playerDeath(){
 gameOver=true;
 player.alive=false;
 explosion(player.points[0].x,
 player.points[0].y,player.color);
-document.getElementById("score").innerText=
-"Score: "+Math.floor(player.length);
 document.getElementById("menu").style.display="block";
 }
 
 function update(){
-ctx.fillStyle="#050816";
+ctx.fillStyle="#020617";
 ctx.fillRect(0,0,canvas.width,canvas.height);
 
 if(!gameOver){
-
-zoom=1-Math.min(player.length/8000,0.4);
 
 ctx.save();
 ctx.translate(
@@ -211,40 +197,49 @@ ctx.translate(
 
 let camX=player.points[0].x-canvas.width/2;
 let camY=player.points[0].y-canvas.height/2;
-ctx.scale(zoom,zoom);
 ctx.translate(-camX,-camY);
 
 foods.forEach((f,i)=>{
+f.pulse+=0.05;
+let size=f.rare?10:6;
+let glow=size+Math.sin(f.pulse)*2;
+
 ctx.fillStyle=f.rare?"#facc15":"#fde047";
 ctx.beginPath();
-ctx.arc(f.x,f.y,f.rare?12:6,0,Math.PI*2);
+ctx.arc(f.x,f.y,glow,0,Math.PI*2);
 ctx.fill();
 
 let dx=player.points[0].x-f.x;
 let dy=player.points[0].y-f.y;
 if(Math.hypot(dx,dy)<15){
 foods.splice(i,1);
-player.length+=f.rare?200:30;
-player.xp+=10;
-if(player.xp>=100){
-player.level++;
-player.xp=0;
-}
-localStorage.setItem("xp",player.xp);
-localStorage.setItem("level",player.level);
+player.length+=f.rare?200:25;
 spawnFood();
 }
 });
 
 player.update();
-enemies.forEach(e=>e.update());
+enemies.forEach(e=>{
+e.update();
+
+let dx=e.points[0].x-player.points[0].x;
+let dy=e.points[0].y-player.points[0].y;
+if(Math.hypot(dx,dy)<12){
+explosion(e.points[0].x,
+e.points[0].y,e.color);
+e.alive=false;
+for(let j=0;j<30;j++)
+foods.push({x:e.points[0].x+(Math.random()-0.5)*40,
+y:e.points[0].y+(Math.random()-0.5)*40,
+rare:false,pulse:0});
+}
+});
 
 player.draw();
 enemies.forEach(e=>e.draw());
 
 ctx.restore();
 shake*=0.9;
-updateRank();
 }
 
 particles.forEach((p,i)=>{
@@ -252,28 +247,16 @@ p.x+=p.vx;
 p.y+=p.vy;
 p.life--;
 ctx.fillStyle=p.color;
+ctx.globalAlpha=p.life/80;
 ctx.beginPath();
 ctx.arc(p.x,p.y,3,0,Math.PI*2);
 ctx.fill();
+ctx.globalAlpha=1;
 if(p.life<=0)particles.splice(i,1);
 });
 
 player.stamina=Math.min(100,
 player.stamina+(player.speed===player.baseSpeed?0.5:-1));
-
-document.getElementById("boost").innerText=
-Math.floor(player.stamina);
-document.getElementById("level").innerText=player.level;
-document.getElementById("xp").innerText=player.xp;
-
-let fakePlayers=[player,...enemies];
-fakePlayers.sort((a,b)=>b.length-a.length);
-let text="<b>Leaderboard</b><br>";
-fakePlayers.slice(0,5).forEach((s,i)=>{
-text+=(i+1)+". "+(s.isBoss?"BOSS":(s.isAI?"AI":"YOU"))+
-" ("+Math.floor(s.length)+")<br>";
-});
-document.getElementById("leaderboard").innerHTML=text;
 
 requestAnimationFrame(update);
 }
