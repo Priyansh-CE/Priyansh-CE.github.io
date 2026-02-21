@@ -2,18 +2,19 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Real Snake Battle</title>
+<title>Neon Snake Arena</title>
 <style>
 body{
     margin:0;
     overflow:hidden;
-    background:#0a0a0a;
+    background:#0a0f1f;
     font-family:Arial;
 }
+canvas{display:block;}
 #ui{
     position:fixed;
     top:10px;
-    left:10px;
+    left:15px;
     color:white;
     font-size:18px;
 }
@@ -40,7 +41,11 @@ button{
 <body>
 
 <canvas id="game"></canvas>
-<div id="ui">Score: <span id="score">0</span></div>
+
+<div id="ui">
+Score: <span id="score">0</span> |
+High: <span id="high">0</span>
+</div>
 
 <div id="menu">
 <h2 style="color:white">GAME OVER</h2>
@@ -54,57 +59,67 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let player, enemies, foods;
-let score = 0;
-let gameOver = false;
+let player, enemies=[], foods=[], particles=[];
+let score=0;
+let highScore = localStorage.getItem("snakeHigh") || 0;
+let gameOver=false;
+let boosting=false;
+
+document.getElementById("high").innerText = highScore;
 
 class Snake{
     constructor(x,y,color,isAI=false){
-        this.segments = [];
-        this.color = color;
-        this.speed = 2;
-        this.isAI = isAI;
-        this.angle = 0;
-        for(let i=0;i<20;i++){
-            this.segments.push({x:x-i*10,y:y});
+        this.segments=[];
+        this.color=color;
+        this.speed=2;
+        this.angle=0;
+        this.isAI=isAI;
+        for(let i=0;i<25;i++){
+            this.segments.push({x:x-i*8,y:y});
         }
     }
 
     update(){
         if(this.isAI){
-            this.angle += (Math.random()-0.5)*0.2;
+            let target = foods[Math.floor(Math.random()*foods.length)];
+            if(target){
+                this.angle = Math.atan2(target.y-this.segments[0].y,
+                                        target.x-this.segments[0].x);
+            }
         }
 
+        let currentSpeed = boosting && !this.isAI ? 4 : this.speed;
+
         let head = this.segments[0];
-        let newX = head.x + Math.cos(this.angle)*this.speed;
-        let newY = head.y + Math.sin(this.angle)*this.speed;
+        let newX = head.x + Math.cos(this.angle)*currentSpeed;
+        let newY = head.y + Math.sin(this.angle)*currentSpeed;
 
         this.segments.unshift({x:newX,y:newY});
         this.segments.pop();
+
+        if(boosting && this.segments.length>20 && !this.isAI){
+            this.segments.pop();
+        }
     }
 
-    grow(amount){
-        for(let i=0;i<amount;i++){
+    grow(n){
+        for(let i=0;i<n;i++){
             this.segments.push({...this.segments[this.segments.length-1]});
         }
     }
 
     draw(){
         for(let i=this.segments.length-1;i>=0;i--){
-            let s = this.segments[i];
-            let radius = 8 + i*0.03;
+            let s=this.segments[i];
+            let radius=8 + i*0.02;
             ctx.beginPath();
             ctx.arc(s.x,s.y,radius,0,Math.PI*2);
-            ctx.fillStyle = this.color;
+            ctx.fillStyle=this.color;
+            ctx.shadowBlur=15;
+            ctx.shadowColor=this.color;
             ctx.fill();
         }
-
-        // Eyes
-        let head = this.segments[0];
-        ctx.fillStyle="white";
-        ctx.beginPath();
-        ctx.arc(head.x+5,head.y-3,3,0,Math.PI*2);
-        ctx.fill();
+        ctx.shadowBlur=0;
     }
 }
 
@@ -114,19 +129,30 @@ function spawnFood(x,y){
 
 function explodeSnake(snake){
     snake.segments.forEach(seg=>{
+        for(let i=0;i<3;i++){
+            particles.push({
+                x:seg.x,
+                y:seg.y,
+                dx:(Math.random()-0.5)*4,
+                dy:(Math.random()-0.5)*4,
+                life:60
+            });
+        }
         spawnFood(seg.x,seg.y);
     });
 }
 
 function init(){
     player = new Snake(canvas.width/2,canvas.height/2,"#22c55e");
-    enemies = [
+    enemies=[
         new Snake(200,200,"#ef4444",true),
         new Snake(800,400,"#3b82f6",true)
     ];
     foods=[];
-    for(let i=0;i<100;i++){
-        spawnFood(Math.random()*canvas.width,Math.random()*canvas.height);
+    particles=[];
+    for(let i=0;i<150;i++){
+        spawnFood(Math.random()*canvas.width,
+                  Math.random()*canvas.height);
     }
     score=0;
     gameOver=false;
@@ -134,65 +160,86 @@ function init(){
 }
 
 canvas.addEventListener("mousemove",e=>{
-    let dx = e.clientX - player.segments[0].x;
-    let dy = e.clientY - player.segments[0].y;
-    player.angle = Math.atan2(dy,dx);
+    player.angle=Math.atan2(
+        e.clientY-player.segments[0].y,
+        e.clientX-player.segments[0].x
+    );
 });
 
+canvas.addEventListener("mousedown",()=>boosting=true);
+canvas.addEventListener("mouseup",()=>boosting=false);
+
 function checkCollision(){
-    enemies.forEach((enemy,index)=>{
+    enemies.forEach((enemy,ei)=>{
         enemy.segments.forEach(seg=>{
-            let dx = player.segments[0].x - seg.x;
-            let dy = player.segments[0].y - seg.y;
-            if(Math.hypot(dx,dy)<8){
+            if(dist(player.segments[0],seg)<8){
                 explodeSnake(player);
-                gameOver=true;
-                document.getElementById("menu").style.display="block";
+                endGame();
             }
         });
 
         player.segments.forEach(seg=>{
-            let dx = enemy.segments[0].x - seg.x;
-            let dy = enemy.segments[0].y - seg.y;
-            if(Math.hypot(dx,dy)<8){
+            if(dist(enemy.segments[0],seg)<8){
                 explodeSnake(enemy);
-                enemies.splice(index,1);
+                enemies.splice(ei,1);
             }
         });
     });
 }
 
-function update(){
-    if(gameOver) return;
+function endGame(){
+    gameOver=true;
+    if(score>highScore){
+        highScore=score;
+        localStorage.setItem("snakeHigh",highScore);
+    }
+    document.getElementById("high").innerText=highScore;
+    document.getElementById("menu").style.display="block";
+}
 
-    ctx.fillStyle="#0a0a0a";
+function dist(a,b){
+    return Math.hypot(a.x-b.x,a.y-b.y);
+}
+
+function update(){
+    ctx.fillStyle="#0a0f1f";
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
-    player.update();
-    player.draw();
+    if(!gameOver){
+        player.update();
+        player.draw();
 
-    enemies.forEach(e=>{
-        e.update();
-        e.draw();
+        enemies.forEach(e=>{
+            e.update();
+            e.draw();
+        });
+
+        foods.forEach((f,i)=>{
+            ctx.beginPath();
+            ctx.arc(f.x,f.y,f.r,0,Math.PI*2);
+            ctx.fillStyle="#facc15";
+            ctx.fill();
+
+            if(dist(player.segments[0],f)<10){
+                foods.splice(i,1);
+                player.grow(5);
+                score++;
+                document.getElementById("score").innerText=score;
+            }
+        });
+
+        checkCollision();
+    }
+
+    particles.forEach((p,i)=>{
+        p.x+=p.dx;
+        p.y+=p.dy;
+        p.life--;
+        ctx.fillStyle="orange";
+        ctx.fillRect(p.x,p.y,3,3);
+        if(p.life<=0) particles.splice(i,1);
     });
 
-    foods.forEach((food,i)=>{
-        ctx.beginPath();
-        ctx.arc(food.x,food.y,food.r,0,Math.PI*2);
-        ctx.fillStyle="#facc15";
-        ctx.fill();
-
-        let dx = player.segments[0].x - food.x;
-        let dy = player.segments[0].y - food.y;
-        if(Math.hypot(dx,dy)<10){
-            foods.splice(i,1);
-            player.grow(5);
-            score++;
-            document.getElementById("score").innerText=score;
-        }
-    });
-
-    checkCollision();
     requestAnimationFrame(update);
 }
 
