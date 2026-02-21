@@ -2,18 +2,16 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>ULTRA GOD MODE PHASE 2</title>
+<title>ULTRA FINAL FORM</title>
 <style>
-body{margin:0;overflow:hidden;background:#050510;font-family:Arial;color:white}
+body{margin:0;overflow:hidden;background:#060612;font-family:Arial;color:white}
 canvas{display:block}
-
 #hud{
 position:fixed;
 top:10px;
 left:10px;
 z-index:10;
 }
-
 #menu{
 position:fixed;
 top:50%;
@@ -22,27 +20,9 @@ transform:translate(-50%,-50%);
 background:#111;
 padding:40px;
 border-radius:15px;
-text-align:center;
 display:none;
+text-align:center;
 }
-
-#skinSelect{
-position:fixed;
-bottom:10px;
-left:50%;
-transform:translateX(-50%);
-z-index:10;
-}
-
-.skin{
-width:30px;
-height:30px;
-border-radius:50%;
-display:inline-block;
-margin:5px;
-cursor:pointer;
-}
-
 button{
 padding:10px 20px;
 margin-top:15px;
@@ -59,15 +39,14 @@ cursor:pointer;
 <div id="hud">
 Score: <span id="score">0</span><br>
 High: <span id="high">0</span><br>
-Combo: <span id="combo">0</span>
+Combo: <span id="combo">0</span><br>
+Stamina: <span id="stamina">100</span>
 </div>
 
 <div id="menu">
 <h2>YOU DIED</h2>
 <button onclick="restart()">Restart</button>
 </div>
-
-<div id="skinSelect"></div>
 
 <canvas id="game"></canvas>
 
@@ -77,40 +56,28 @@ const ctx=canvas.getContext("2d");
 canvas.width=window.innerWidth;
 canvas.height=window.innerHeight;
 
-let worldSize=6000;
-let foods=[];
-let enemies=[];
-let particles=[];
-let score=0;
-let combo=0;
-let gameOver=false;
-let highScore=localStorage.getItem("godHigh")||0;
+let worldSize=7000;
+let foods=[], enemies=[], particles=[], bg=[];
+let score=0, combo=0, gameOver=false;
+let highScore=localStorage.getItem("finalHigh")||0;
 document.getElementById("high").innerText=highScore;
-
-const skins=["#00ffaa","#ff3b3b","#00aaff","#ff00ff","#ffff00"];
-let selectedSkin=skins[0];
-
-const skinDiv=document.getElementById("skinSelect");
-skins.forEach(color=>{
-let s=document.createElement("div");
-s.className="skin";
-s.style.background=color;
-s.onclick=()=>selectedSkin=color;
-skinDiv.appendChild(s);
-});
 
 class Snake{
 constructor(x,y,color,isAI=false,isBoss=false){
 this.points=[{x,y}];
-this.length=isBoss?800:200;
+this.length=isBoss?1000:250;
 this.color=color;
 this.angle=0;
 this.targetAngle=0;
 this.turnSpeed=0.08;
+this.baseSpeed=2;
 this.speed=2;
+this.boost=false;
+this.stamina=100;
 this.isAI=isAI;
 this.isBoss=isBoss;
 this.alive=true;
+this.magnet=0;
 }
 
 update(){
@@ -119,6 +86,17 @@ if(!this.alive)return;
 let diff=this.targetAngle-this.angle;
 diff=Math.atan2(Math.sin(diff),Math.cos(diff));
 this.angle+=diff*this.turnSpeed;
+
+this.speed=this.baseSpeed - this.points.length*0.0015;
+if(this.speed<1.4)this.speed=1.4;
+
+if(this.boost && this.stamina>0){
+this.speed=4;
+this.stamina-=0.7;
+}else{
+this.stamina+=0.4;
+}
+if(this.stamina>100)this.stamina=100;
 
 this.points.unshift({
 x:this.points[0].x+Math.cos(this.angle)*this.speed,
@@ -133,29 +111,26 @@ this.points[i].y+=dy*0.3;
 }
 
 if(this.points.length>this.length/4)this.points.pop();
+if(this.magnet>0)this.magnet--;
 }
 
 draw(){
 if(!this.alive)return;
-
 ctx.beginPath();
 ctx.lineJoin="round";
 ctx.lineCap="round";
-ctx.lineWidth=this.isBoss?20:14;
+ctx.lineWidth=this.isBoss?22:16;
 ctx.strokeStyle=this.color;
 ctx.shadowBlur=20;
 ctx.shadowColor=this.color;
 ctx.moveTo(this.points[0].x,this.points[0].y);
-for(let p of this.points){
-ctx.lineTo(p.x,p.y);
-}
+for(let p of this.points) ctx.lineTo(p.x,p.y);
 ctx.stroke();
 ctx.shadowBlur=0;
 
-// crown for biggest
-if(this.length>1000 && !this.isAI){
+if(this.length>1500 && !this.isAI){
 ctx.fillStyle="gold";
-ctx.fillText("👑",this.points[0].x-10,this.points[0].y-20);
+ctx.fillText("👑",this.points[0].x-10,this.points[0].y-25);
 }
 }
 
@@ -171,23 +146,25 @@ size:Math.random()*6+2,
 color:this.color
 });
 }
-for(let i=0;i<100;i++){
+for(let i=0;i<120;i++){
 foods.push({
 x:this.points[0].x+(Math.random()-0.5)*200,
-y:this.points[0].y+(Math.random()-0.5)*200
+y:this.points[0].y+(Math.random()-0.5)*200,
+rare:false
 });
 }
 this.alive=false;
 }
 }
 
-let player=new Snake(worldSize/2,worldSize/2,selectedSkin);
+let player=new Snake(worldSize/2,worldSize/2,"#00ffaa");
 spawnEnemies();
-spawnFood();
 spawnBoss();
+spawnFood();
+spawnBG();
 
 function spawnEnemies(){
-for(let i=0;i<5;i++){
+for(let i=0;i<6;i++){
 enemies.push(new Snake(
 Math.random()*worldSize,
 Math.random()*worldSize,
@@ -202,16 +179,27 @@ enemies.push(new Snake(
 Math.random()*worldSize,
 Math.random()*worldSize,
 "#ff0000",
-true,
-true
+true,true
 ));
 }
 
 function spawnFood(){
-for(let i=0;i<500;i++){
+for(let i=0;i<600;i++){
 foods.push({
 x:Math.random()*worldSize,
-y:Math.random()*worldSize
+y:Math.random()*worldSize,
+rare:Math.random()<0.05
+});
+}
+}
+
+function spawnBG(){
+for(let i=0;i<200;i++){
+bg.push({
+x:Math.random()*canvas.width,
+y:Math.random()*canvas.height,
+r:Math.random()*2,
+speed:Math.random()*0.5+0.2
 });
 }
 }
@@ -222,6 +210,8 @@ e.clientY-canvas.height/2,
 e.clientX-canvas.width/2
 );
 });
+window.addEventListener("mousedown",()=>player.boost=true);
+window.addEventListener("mouseup",()=>player.boost=false);
 
 function update(){
 if(gameOver)return;
@@ -233,13 +223,13 @@ if(!e.alive)return;
 
 let dx=player.points[0].x-e.points[0].x;
 let dy=player.points[0].y-e.points[0].y;
+let dist=Math.hypot(dx,dy);
 
-if(Math.hypot(dx,dy)<800){
+if(dist<800){
 e.targetAngle=Math.atan2(dy,dx);
 }else{
 e.targetAngle+=(Math.random()-0.5)*0.2;
 }
-
 e.update();
 });
 
@@ -252,6 +242,7 @@ function collisions(){
 enemies.forEach(e=>{
 if(!e.alive)return;
 
+// player hits enemy body
 for(let i=5;i<e.points.length;i++){
 if(distance(player.points[0],e.points[i])<10){
 player.explode();
@@ -259,6 +250,7 @@ endGame();
 }
 }
 
+// enemy hits player body
 for(let i=5;i<player.points.length;i++){
 if(distance(e.points[0],player.points[i])<10){
 e.explode();
@@ -272,10 +264,20 @@ combo++;
 
 function eatFood(){
 foods.forEach((f,i)=>{
-if(distance(player.points[0],f)<15){
+let d=distance(player.points[0],f);
+let range=player.magnet>0?200:20;
+
+if(d<range){
+if(player.magnet>0){
+f.x+=(player.points[0].x-f.x)*0.2;
+f.y+=(player.points[0].y-f.y)*0.2;
+}
+if(d<15){
 foods.splice(i,1);
-player.length+=30;
-score+=10;
+player.length+=f.rare?100:30;
+score+=f.rare?50:10;
+if(f.rare)player.magnet=400;
+}
 }
 });
 }
@@ -292,8 +294,18 @@ if(p.life<=0)particles.splice(i,1);
 function draw(){
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
+// moving background
+bg.forEach(p=>{
+ctx.fillStyle="rgba(255,255,255,0.1)";
+ctx.beginPath();
+ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+ctx.fill();
+p.y+=p.speed;
+if(p.y>canvas.height)p.y=0;
+});
+
 // dynamic zoom
-let zoom=1+(player.length/2000);
+let zoom=1+(player.length/2500);
 ctx.save();
 ctx.scale(1/zoom,1/zoom);
 
@@ -302,10 +314,10 @@ let camY=player.points[0].y-canvas.height/2*zoom;
 ctx.translate(-camX,-camY);
 
 // food
-ctx.fillStyle="#ffaa00";
 foods.forEach(f=>{
+ctx.fillStyle=f.rare?"#ff00ff":"#ffaa00";
 ctx.beginPath();
-ctx.arc(f.x,f.y,4,0,Math.PI*2);
+ctx.arc(f.x,f.y,f.rare?6:4,0,Math.PI*2);
 ctx.fill();
 });
 
@@ -326,6 +338,7 @@ ctx.restore();
 
 document.getElementById("score").innerText=score;
 document.getElementById("combo").innerText=combo;
+document.getElementById("stamina").innerText=Math.floor(player.stamina);
 }
 
 function distance(a,b){
@@ -336,7 +349,7 @@ function endGame(){
 gameOver=true;
 if(score>highScore){
 highScore=score;
-localStorage.setItem("godHigh",highScore);
+localStorage.setItem("finalHigh",highScore);
 }
 document.getElementById("menu").style.display="block";
 }
