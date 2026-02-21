@@ -49,11 +49,12 @@ canvas.height = window.innerHeight;
 
 let player, enemy, foods=[], particles=[];
 let gameOver=false;
+let boosting=false;
 
 class Snake{
     constructor(x,y,color,isAI=false){
         this.points=[];
-        this.speed=2.2;
+        this.baseSpeed=2.2;
         this.angle=0;
         this.length=300;
         this.radius=10;
@@ -67,28 +68,20 @@ class Snake{
 
     update(){
         if(this.isAI){
-            // simple AI hunts nearest food
-            let nearest = foods[0];
-            let minDist = Infinity;
-            foods.forEach(f=>{
-                let d = Math.hypot(this.points[0].x-f.x,
-                                   this.points[0].y-f.y);
-                if(d < minDist){
-                    minDist = d;
-                    nearest = f;
-                }
-            });
-            if(nearest){
+            let target = foods[0];
+            if(target){
                 this.angle = Math.atan2(
-                    nearest.y-this.points[0].y,
-                    nearest.x-this.points[0].x
+                    target.y-this.points[0].y,
+                    target.x-this.points[0].x
                 );
             }
         }
 
+        let speed = boosting && !this.isAI ? 4 : this.baseSpeed;
+
         const head = this.points[0];
-        const nx = head.x + Math.cos(this.angle)*this.speed;
-        const ny = head.y + Math.sin(this.angle)*this.speed;
+        const nx = head.x + Math.cos(this.angle)*speed;
+        const ny = head.y + Math.sin(this.angle)*speed;
 
         this.points.unshift({x:nx,y:ny});
 
@@ -102,6 +95,10 @@ class Snake{
                 this.points.splice(i+1);
                 break;
             }
+        }
+
+        if(boosting && this.length>150 && !this.isAI){
+            this.length -= 0.5;
         }
     }
 
@@ -135,14 +132,6 @@ class Snake{
         ctx.stroke();
 
         ctx.shadowBlur=0;
-
-        // scale texture effect
-        for(let i=0;i<this.points.length;i+=8){
-            ctx.beginPath();
-            ctx.arc(this.points[i].x,this.points[i].y,2,0,Math.PI*2);
-            ctx.fillStyle="rgba(255,255,255,0.08)";
-            ctx.fill();
-        }
     }
 }
 
@@ -178,10 +167,35 @@ function init(){
     document.getElementById("menu").style.display="none";
 }
 
+//// CONTROLS
+
+// Mouse
 canvas.addEventListener("mousemove",e=>{
     player.angle=Math.atan2(
         e.clientY-player.points[0].y,
         e.clientX-player.points[0].x
+    );
+});
+
+// Keyboard
+document.addEventListener("keydown",e=>{
+    if(e.key==="ArrowUp" || e.key==="w") player.angle=-Math.PI/2;
+    if(e.key==="ArrowDown" || e.key==="s") player.angle=Math.PI/2;
+    if(e.key==="ArrowLeft" || e.key==="a") player.angle=Math.PI;
+    if(e.key==="ArrowRight" || e.key==="d") player.angle=0;
+    if(e.key==="Shift") boosting=true;
+});
+
+document.addEventListener("keyup",e=>{
+    if(e.key==="Shift") boosting=false;
+});
+
+// Mobile touch
+canvas.addEventListener("touchmove",e=>{
+    const touch=e.touches[0];
+    player.angle=Math.atan2(
+        touch.clientY-player.points[0].y,
+        touch.clientX-player.points[0].x
     );
 });
 
@@ -224,7 +238,6 @@ function update(){
         checkCollision();
     }
 
-    // particles
     particles.forEach((p,i)=>{
         p.x+=p.dx;
         p.y+=p.dy;
