@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>ULTRA GOD MODE OFFLINE MULTIPLAYER</title>
+<title>ULTRA GOD MODE OFFLINE ARENA</title>
 <style>
 body{margin:0;overflow:hidden;background:#060612;font-family:Arial;color:white}
 canvas{display:block}
@@ -24,40 +24,51 @@ button{padding:10px 20px;margin-top:15px;border:none;border-radius:8px;backgroun
 <canvas id="game"></canvas>
 
 <script>
-// ==== SETTINGS ====
+// ===== SETTINGS =====
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 canvas.width=innerWidth; canvas.height=innerHeight;
 window.addEventListener("resize",()=>{canvas.width=innerWidth; canvas.height=innerHeight;});
 
-const worldSize=6000;
-let foods=[], enemies=[], particles=[], bg=[];
-let gameOver=false, shake=0;
-let highScore=localStorage.getItem("ultraMultiHigh")||0;
-let leaderboard=[];
+const worldSize=7000;
+let foods=[], particles=[], bg=[];
+let gameOver=false;
+let highScore=localStorage.getItem("ultraArenaHigh")||0;
 
-// ==== UTILS ====
+// ===== UTILS =====
 function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
-function playSound(name){/* implement sounds here */}
 function restart(){location.reload();}
 
-// ==== SNAKE CLASS ====
+// ===== SNAKE CLASS =====
 class Snake{
-constructor(x,y,color,isAI=false,controls=null){
-this.points=[{x,y}]; this.length=250; this.color=color;
-this.angle=0; this.targetAngle=0; this.turnSpeed=0.08;
-this.baseSpeed=2; this.speed=2; this.boost=false;
-this.stamina=100; this.isAI=isAI; this.controls=controls;
-this.alive=true; this.magnet=0; this.score=0;
+constructor(x,y,color,isAI=false,isBoss=false,controls=null){
+this.points=[{x,y}];
+this.length=isBoss?600:250;
+this.color=color;
+this.angle=0;
+this.targetAngle=0;
+this.turnSpeed=0.08;
+this.baseSpeed=2;
+this.speed=2;
+this.boost=false;
+this.stamina=100;
+this.isAI=isAI;
+this.isBoss=isBoss;
+this.alive=true;
+this.magnet=0;
+this.score=0;
+this.controls=controls;
 }
 update(){
 if(!this.alive)return;
 
-// AI control
+// AI
 if(this.isAI){
 let target={x:player1.points[0].x,y:player1.points[0].y};
 let dx=target.x-this.points[0].x, dy=target.y-this.points[0].y;
-this.targetAngle=Math.atan2(dy,dx);
+let dist=Math.hypot(dx,dy);
+if(dist<600)this.targetAngle=Math.atan2(dy,dx);
+else this.targetAngle+=(Math.random()-0.5)*0.3;
 }
 
 // smooth turning
@@ -67,12 +78,12 @@ this.angle+=diff*this.turnSpeed;
 
 // speed
 this.speed=this.baseSpeed;
-if(this.boost&&this.stamina>0){this.speed=4; this.stamina-=0.7;}
+if(this.boost && this.stamina>0){this.speed=4; this.stamina-=0.7;}
 else this.stamina+=0.4;
 if(this.stamina>100)this.stamina=100;
 
-// move snake
-this.points.unshift({x:this.points[0].x+Math.cos(this.angle)*this.speed,y:this.points[0].y+Math.sin(this.angle)*this.speed});
+// move
+this.points.unshift({x:this.points[0].x+Math.cos(this.angle)*this.speed, y:this.points[0].y+Math.sin(this.angle)*this.speed});
 for(let i=1;i<this.points.length;i++){
 let dx=this.points[i-1].x-this.points[i].x;
 let dy=this.points[i-1].y-this.points[i].y;
@@ -81,39 +92,45 @@ if(this.points.length>this.length/4)this.points.pop();
 }
 draw(){
 if(!this.alive)return;
-ctx.beginPath();
-ctx.lineJoin="round"; ctx.lineCap="round";
-ctx.lineWidth=16; ctx.strokeStyle=this.color;
+ctx.beginPath(); ctx.lineJoin="round"; ctx.lineCap="round";
+ctx.lineWidth=this.isBoss?22:16;
+ctx.strokeStyle=this.color;
 ctx.shadowBlur=20; ctx.shadowColor=this.color;
 ctx.moveTo(this.points[0].x,this.points[0].y);
-for(let p of this.points)ctx.lineTo(p.x,p.y);
+for(let p of this.points) ctx.lineTo(p.x,p.y);
 ctx.stroke(); ctx.shadowBlur=0;
 }
 explode(){
-for(let i=0;i<80;i++){
+for(let i=0;i<100;i++){
 particles.push({x:this.points[0].x,y:this.points[0].y,vx:(Math.random()-0.5)*8,vy:(Math.random()-0.5)*8,life:60,size:Math.random()*5+2,color:this.color});
-foods.push({x:this.points[0].x+(Math.random()-0.5)*200,y:this.points[0].y+(Math.random()-0.5)*200,rare:false});
+foods.push({x:this.points[0].x+(Math.random()-0.5)*200, y:this.points[0].y+(Math.random()-0.5)*200, rare:false});
 }
-this.alive=false; playSound('death');
+this.alive=false;
 }
 }
 
-// ==== SPAWN ====
-let player1=new Snake(worldSize/2,worldSize/2,"#00ffaa"); // main player, camera follows
-let player2=new Snake(worldSize/2+100,worldSize/2+100,"#ff007f",{up:"w",down:"s",left:"a",right:"d",boost:"Shift"});
-let player3=new Snake(worldSize/2-100,worldSize/2-100,"#00aaff",{up:"ArrowUp",down:"ArrowDown",left:"ArrowLeft",right:"ArrowRight",boost:" "});
+// ===== SPAWN PLAYERS =====
+let player1=new Snake(worldSize/2,worldSize/2,"#00ffaa");
+let player2=new Snake(worldSize/2+100,worldSize/2+100,"#ff007f",false,false,{up:"w",down:"s",left:"a",right:"d",boost:"Shift"});
+let player3=new Snake(worldSize/2-100,worldSize/2-100,"#00aaff",false,false,{up:"ArrowUp",down:"ArrowDown",left:"ArrowLeft",right:"ArrowRight",boost:" "});
 let players=[player1,player2,player3];
 
+// ===== SPAWN AI + BOSS =====
+let aiEnemies=[];
+function spawnAI(){for(let i=0;i<6;i++){aiEnemies.push(new Snake(Math.random()*worldSize,Math.random()*worldSize,`hsl(${Math.random()*360},80%,60%)`,true));}}
+function spawnBoss(){aiEnemies.push(new Snake(Math.random()*worldSize,Math.random()*worldSize,"#ff0000",true,true));}
+spawnAI(); spawnBoss();
+
+// ===== FOOD & BG =====
 function spawnFood(){for(let i=0;i<500;i++){foods.push({x:Math.random()*worldSize,y:Math.random()*worldSize,rare:Math.random()<0.05});}}
 function spawnBG(){for(let i=0;i<200;i++){bg.push({x:Math.random()*canvas.width,y:Math.random()*canvas.height,r:Math.random()*2,speed:Math.random()*0.5+0.2});}}
 spawnFood(); spawnBG();
 
-// ==== CONTROLS ====
+// ===== CONTROLS =====
 const keys={};
 window.addEventListener("keydown",e=>{keys[e.key]=true;});
 window.addEventListener("keyup",e=>{keys[e.key]=false;});
 
-// player2 & player3 controls
 function controlSnake(s){
 if(!s.controls||!s.alive)return;
 if(keys[s.controls.left])s.targetAngle=Math.PI;
@@ -123,22 +140,19 @@ if(keys[s.controls.down])s.targetAngle=Math.PI/2;
 s.boost=keys[s.controls.boost];
 }
 
-// ==== GAME LOGIC ====
+// ===== GAME LOGIC =====
 function collisions(){
-players.forEach(s=>{
+[...players,...aiEnemies].forEach(s=>{
 if(!s.alive)return;
-players.forEach(t=>{
+[...players,...aiEnemies].forEach(t=>{
 if(s===t||!t.alive)return;
-// s head hits t body
-for(let i=5;i<t.points.length;i++){
-if(distance(s.points[0],t.points[i])<12){s.explode();}
-}
+for(let i=5;i<t.points.length;i++){if(distance(s.points[0],t.points[i])<12){s.explode(); if(!s.isAI)s.alive=false;}}
 });
 });
 }
 
 function eatFood(){
-players.forEach(s=>{
+[...players,...aiEnemies].forEach(s=>{
 foods.forEach((f,i)=>{
 let range=s.magnet>0?200:20;
 if(distance(s.points[0],f)<range){
@@ -153,14 +167,12 @@ function updateParticles(){particles.forEach((p,i)=>{p.x+=p.vx;p.y+=p.vy;p.life-
 
 function update(){
 if(gameOver)return;
-players.forEach(s=>{
-if(!s.isAI)controlSnake(s);
-s.update();
-});
+players.forEach(s=>controlSnake(s));
+[...players,...aiEnemies].forEach(s=>s.update());
 collisions(); eatFood(); updateParticles();
 }
 
-// ==== DRAW LOOP ====
+// ===== DRAW LOOP =====
 function draw(){
 ctx.clearRect(0,0,canvas.width,canvas.height);
 let zoom=1+(player1.length/2500);
@@ -171,12 +183,15 @@ ctx.translate(-player1.points[0].x,-player1.points[0].y);
 
 // bg
 bg.forEach(p=>{ctx.fillStyle="rgba(255,255,255,0.1)";ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill(); p.y+=p.speed; if(p.y>canvas.height)p.y=0;});
+
 // food
 foods.forEach(f=>{ctx.fillStyle=f.rare?"#ff00ff":"#ffaa00"; ctx.beginPath(); ctx.arc(f.x,f.y,f.rare?6:4,0,Math.PI*2); ctx.fill();});
+
 // particles
-particles.forEach(p=>{ctx.fillStyle=p.color; ctx.globalAlpha=p.life/60; ctx.beginPath(); ctx.arc(p.x,p.y,p.size,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;});
+particles.forEach(p=>{ctx.fillStyle=p.color; ctx.globalAlpha=p.life/60; ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill(); ctx.globalAlpha=1;});
+
 // snakes
-players.forEach(s=>s.draw());
+[...players,...aiEnemies].forEach(s=>s.draw());
 ctx.restore();
 
 // HUD
@@ -184,7 +199,7 @@ let hudText=""; players.forEach((s,i)=>{hudText+=`P${i+1} Score: ${s.score} Stam
 document.getElementById("hud").innerHTML=hudText;
 }
 
-// ==== GAME LOOP ====
+// ===== GAME LOOP =====
 function loop(){update(); draw(); requestAnimationFrame(loop);}
 loop();
 </script>
