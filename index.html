@@ -127,10 +127,17 @@ function spawnBG(){for(let i=0;i<200;i++){bg.push({x:Math.random()*canvas.width,
 spawnFood(); spawnBG();
 
 // ===== CONTROLS =====
+// Mouse for player1
+canvas.addEventListener("mousemove",e=>{
+player1.targetAngle=Math.atan2(e.clientY-canvas.height/2,e.clientX-canvas.width/2);
+});
+window.addEventListener("mousedown",()=>player1.boost=true);
+window.addEventListener("mouseup",()=>player1.boost=false);
+
+// Keyboard
 const keys={};
 window.addEventListener("keydown",e=>{keys[e.key]=true;});
 window.addEventListener("keyup",e=>{keys[e.key]=false;});
-
 function controlSnake(s){
 if(!s.controls||!s.alive)return;
 if(keys[s.controls.left])s.targetAngle=Math.PI;
@@ -150,7 +157,6 @@ for(let i=5;i<t.points.length;i++){if(distance(s.points[0],t.points[i])<12){s.ex
 });
 });
 }
-
 function eatFood(){
 [...players,...aiEnemies].forEach(s=>{
 foods.forEach((f,i)=>{
@@ -162,7 +168,6 @@ if(distance(s.points[0],f)<15){foods.splice(i,1); s.length+=f.rare?100:30; s.sco
 });
 });
 }
-
 function updateParticles(){particles.forEach((p,i)=>{p.x+=p.vx;p.y+=p.vy;p.life--; if(p.life<=0)particles.splice(i,1);});}
 
 function update(){
