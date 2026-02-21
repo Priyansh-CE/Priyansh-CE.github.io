@@ -2,9 +2,9 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Snake Arena ULTRA ELITE</title>
+<title>Snake Arena ULTRA OFFLINE ELITE</title>
 <style>
-body{margin:0;overflow:hidden;background:#030712;font-family:Arial}
+body{margin:0;overflow:hidden;background:#050816;font-family:Arial}
 canvas{display:block}
 #ui{
 position:fixed;top:10px;left:10px;color:white;font-size:14px}
@@ -16,6 +16,9 @@ button{
 padding:10px 20px;margin:10px;
 border:none;background:#22c55e;
 color:black;font-weight:bold;cursor:pointer}
+#leaderboard{
+position:fixed;top:10px;right:10px;
+color:white;font-size:14px;text-align:right}
 </style>
 </head>
 <body>
@@ -25,8 +28,11 @@ color:black;font-weight:bold;cursor:pointer}
 <div id="ui">
 Level: <span id="level">1</span><br>
 XP: <span id="xp">0</span><br>
-Boost: <span id="boost">100</span>
+Boost: <span id="boost">100</span><br>
+Rank: <span id="rank">Bronze</span>
 </div>
+
+<div id="leaderboard"></div>
 
 <div id="menu">
 <h1>GAME OVER</h1>
@@ -41,26 +47,32 @@ canvas.width=innerWidth;
 canvas.height=innerHeight;
 
 const WORLD=6000;
-let player,enemies=[],foods=[],particles=[],bgParticles=[];
+
+let player,enemies=[],foods=[],particles=[];
 let gameOver=false;
 let shake=0;
-let slowMo=1;
+let zoom=1;
+
+let savedXP=parseInt(localStorage.getItem("xp"))||0;
+let savedLevel=parseInt(localStorage.getItem("level"))||1;
 
 class Snake{
-constructor(x,y,color,isAI=false){
+constructor(x,y,color,isAI=false,isBoss=false){
 this.points=[];
 this.angle=0;
 this.targetAngle=0;
-this.speed=2;
-this.baseSpeed=2;
-this.length=300;
-this.radius=10;
+this.speed=isBoss?1.5:2;
+this.baseSpeed=this.speed;
+this.length=isBoss?1500:300;
+this.radius=isBoss?20:10;
 this.color=color;
 this.isAI=isAI;
+this.isBoss=isBoss;
 this.alive=true;
 this.stamina=100;
 this.xp=0;
 this.level=1;
+
 for(let i=0;i<200;i++)
 this.points.push({x:x-i,y:y});
 }
@@ -79,8 +91,8 @@ diff=Math.atan2(Math.sin(diff),Math.cos(diff));
 this.angle+=diff*0.08;
 
 let head=this.points[0];
-let nx=head.x+Math.cos(this.angle)*this.speed*slowMo;
-let ny=head.y+Math.sin(this.angle)*this.speed*slowMo;
+let nx=head.x+Math.cos(this.angle)*this.speed;
+let ny=head.y+Math.sin(this.angle)*this.speed;
 this.points.unshift({x:nx,y:ny});
 
 let total=0;
@@ -99,15 +111,9 @@ draw(){
 if(!this.alive)return;
 ctx.lineWidth=this.radius*2;
 ctx.lineCap="round";
-let gradient=ctx.createLinearGradient(
-this.points[0].x,this.points[0].y,
-this.points[30]?.x||this.points[0].x,
-this.points[30]?.y||this.points[0].y);
-gradient.addColorStop(0,"white");
-gradient.addColorStop(1,this.color);
-ctx.strokeStyle=gradient;
+ctx.strokeStyle=this.color;
 ctx.shadowColor=this.color;
-ctx.shadowBlur=20;
+ctx.shadowBlur=this.isBoss?30:15;
 ctx.beginPath();
 ctx.moveTo(this.points[0].x,this.points[0].y);
 for(let i=1;i<this.points.length;i++)
@@ -127,7 +133,7 @@ rare:Math.random()<0.05
 
 function explosion(x,y,color){
 shake=20;
-for(let i=0;i<50;i++){
+for(let i=0;i<40;i++){
 particles.push({
 x,y,
 vx:(Math.random()-0.5)*10,
@@ -139,17 +145,21 @@ color});
 
 function init(){
 player=new Snake(WORLD/2,WORLD/2,"#22c55e");
-enemies=[];foods=[];particles=[];
+player.level=savedLevel;
+player.xp=savedXP;
+
+enemies=[];
+foods=[];
+particles=[];
 gameOver=false;
-for(let i=0;i<500;i++)spawnFood();
+
+for(let i=0;i<400;i++)spawnFood();
+
 for(let i=0;i<6;i++)
 enemies.push(new Snake(Math.random()*WORLD,
 Math.random()*WORLD,"#ef4444",true));
-for(let i=0;i<100;i++)
-bgParticles.push({
-x:Math.random()*canvas.width,
-y:Math.random()*canvas.height,
-speed:Math.random()*0.5+0.2});
+
+enemies.push(new Snake(1000,1000,"#9333ea",true,true));
 }
 
 canvas.addEventListener("mousemove",e=>{
@@ -159,44 +169,46 @@ e.clientX-canvas.width/2);
 });
 
 document.addEventListener("keydown",e=>{
-if(e.key==="Shift"&&player.stamina>0){
+if(e.key==="Shift"&&player.stamina>0)
 player.speed=4;
-}
 });
+
 document.addEventListener("keyup",e=>{
-if(e.key==="Shift")player.speed=player.baseSpeed;
+if(e.key==="Shift")
+player.speed=player.baseSpeed;
 });
+
+function updateRank(){
+let rank="Bronze";
+if(player.level>5)rank="Silver";
+if(player.level>10)rank="Gold";
+if(player.level>20)rank="Diamond";
+document.getElementById("rank").innerText=rank;
+}
 
 function playerDeath(){
 gameOver=true;
 player.alive=false;
-slowMo=0.3;
 explosion(player.points[0].x,
 player.points[0].y,player.color);
-setTimeout(()=>slowMo=1,1500);
 document.getElementById("score").innerText=
 "Score: "+Math.floor(player.length);
 document.getElementById("menu").style.display="block";
 }
 
 function update(){
-ctx.fillStyle="#030712";
+ctx.fillStyle="#050816";
 ctx.fillRect(0,0,canvas.width,canvas.height);
-
-bgParticles.forEach(p=>{
-p.y+=p.speed;
-if(p.y>canvas.height)p.y=0;
-ctx.fillStyle="rgba(255,255,255,0.1)";
-ctx.fillRect(p.x,p.y,2,2);
-});
 
 if(!gameOver){
 
-let zoom=1-Math.min(player.length/5000,0.4);
+zoom=1-Math.min(player.length/8000,0.4);
+
 ctx.save();
 ctx.translate(
 (Math.random()-0.5)*shake,
 (Math.random()-0.5)*shake);
+
 let camX=player.points[0].x-canvas.width/2;
 let camY=player.points[0].y-canvas.height/2;
 ctx.scale(zoom,zoom);
@@ -214,10 +226,12 @@ if(Math.hypot(dx,dy)<15){
 foods.splice(i,1);
 player.length+=f.rare?200:30;
 player.xp+=10;
-if(player.xp>100){
+if(player.xp>=100){
 player.level++;
 player.xp=0;
 }
+localStorage.setItem("xp",player.xp);
+localStorage.setItem("level",player.level);
 spawnFood();
 }
 });
@@ -230,6 +244,7 @@ enemies.forEach(e=>e.draw());
 
 ctx.restore();
 shake*=0.9;
+updateRank();
 }
 
 particles.forEach((p,i)=>{
@@ -251,12 +266,20 @@ Math.floor(player.stamina);
 document.getElementById("level").innerText=player.level;
 document.getElementById("xp").innerText=player.xp;
 
+let fakePlayers=[player,...enemies];
+fakePlayers.sort((a,b)=>b.length-a.length);
+let text="<b>Leaderboard</b><br>";
+fakePlayers.slice(0,5).forEach((s,i)=>{
+text+=(i+1)+". "+(s.isBoss?"BOSS":(s.isAI?"AI":"YOU"))+
+" ("+Math.floor(s.length)+")<br>";
+});
+document.getElementById("leaderboard").innerHTML=text;
+
 requestAnimationFrame(update);
 }
 
 function restart(){
 document.getElementById("menu").style.display="none";
-slowMo=1;
 init();
 }
 
