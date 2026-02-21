@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Snake Arena Ultra</title>
+<title>Snake Arena – Neon Pro</title>
 <style>
 body{
 margin:0;
@@ -12,7 +12,7 @@ font-family:Arial;
 }
 #ui{
 position:fixed;
-top:10px;
+top:15px;
 left:50%;
 transform:translateX(-50%);
 color:white;
@@ -20,26 +20,18 @@ font-weight:bold;
 text-align:center;
 }
 button{
-padding:8px 15px;
+padding:8px 16px;
 margin:5px;
 border:none;
-border-radius:6px;
-background:#00ffaa;
+border-radius:8px;
+background:linear-gradient(45deg,#00f0ff,#ff00f0);
+color:white;
 font-weight:bold;
 cursor:pointer;
+box-shadow:0 0 10px #00f0ff;
 }
-#staminaBar{
-width:200px;
-height:10px;
-background:#333;
-margin:5px auto;
-border-radius:10px;
-overflow:hidden;
-}
-#staminaFill{
-height:100%;
-background:#00ff88;
-width:100%;
+#score{
+font-size:18px;
 }
 </style>
 </head>
@@ -48,8 +40,7 @@ width:100%;
 <canvas id="game"></canvas>
 
 <div id="ui">
-Score: <span id="score">0</span>
-<div id="staminaBar"><div id="staminaFill"></div></div>
+<div id="score">Score: 0</div>
 <button onclick="startGame()">Start</button>
 <button onclick="pauseGame()">Pause</button>
 <button onclick="restartGame()">Restart</button>
@@ -61,41 +52,23 @@ const ctx=canvas.getContext("2d");
 canvas.width=window.innerWidth;
 canvas.height=window.innerHeight;
 
-const MAP_SIZE=4000;
 let keys={};
 let gameRunning=false;
 let gamePaused=false;
-let explosionParticles=[];
+let hueShift=0;
 
 let camera={x:0,y:0,zoom:1};
 
-function playSound(freq){
-const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
-const osc=audioCtx.createOscillator();
-const gain=audioCtx.createGain();
-osc.connect(gain);
-gain.connect(audioCtx.destination);
-osc.frequency.value=freq;
-osc.type="sine";
-osc.start();
-gain.gain.setValueAtTime(0.2,audioCtx.currentTime);
-gain.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+0.2);
-osc.stop(audioCtx.currentTime+0.2);
-}
-
 class Snake{
-constructor(x,y,color,isAI=false){
+constructor(x,y){
 this.x=x;
 this.y=y;
 this.body=[];
-this.mass=50;
+this.mass=60;
 this.angle=0;
-this.baseSpeed=150;
-this.color=color;
-this.isAI=isAI;
+this.targetAngle=0;
+this.speed=150;
 this.alive=true;
-this.stamina=100;
-this.maxStamina=100;
 
 for(let i=0;i<this.mass;i++){
 this.body.push({x,y});
@@ -103,34 +76,21 @@ this.body.push({x,y});
 }
 
 get radius(){
-return 8+this.mass*0.06;
-}
-
-get speed(){
-return this.baseSpeed/(1+this.mass*0.01);
+return 10+this.mass*0.05;
 }
 
 update(dt){
-if(!this.alive || gamePaused) return;
+if(!this.alive||gamePaused) return;
 
-let turning=2.5;
-if(!this.isAI){
-if(keys["ArrowLeft"]) this.angle-=turning*dt;
-if(keys["ArrowRight"]) this.angle+=turning*dt;
-}else{
-this.angle+=(Math.random()-0.5)*1.5*dt;
-}
+if(keys["ArrowLeft"]) this.targetAngle-=2.5*dt;
+if(keys["ArrowRight"]) this.targetAngle+=2.5*dt;
 
-let currentSpeed=this.speed;
-if(!this.isAI && keys[" "] && this.stamina>0){
+this.angle += (this.targetAngle-this.angle)*0.15;
+
+let currentSpeed=this.speed/(1+this.mass*0.01);
+if(keys[" "]){
 currentSpeed*=1.8;
-this.stamina-=40*dt;
-playSound(600);
-}else{
-this.stamina+=20*dt;
 }
-
-this.stamina=Math.max(0,Math.min(this.stamina,this.maxStamina));
 
 this.x+=Math.cos(this.angle)*currentSpeed*dt;
 this.y+=Math.sin(this.angle)*currentSpeed*dt;
@@ -150,77 +110,67 @@ ctx.lineJoin="round";
 for(let i=this.body.length-1;i>0;i--){
 let p1=this.body[i];
 let p2=this.body[i-1];
-ctx.strokeStyle=this.color;
+
+let gradient=ctx.createLinearGradient(p1.x,p1.y,p2.x,p2.y);
+gradient.addColorStop(0,`hsl(${(hueShift+i*2)%360},100%,60%)`);
+gradient.addColorStop(1,`hsl(${(hueShift+i*2+40)%360},100%,50%)`);
+
+ctx.strokeStyle=gradient;
 ctx.lineWidth=this.radius*(i/this.body.length);
+
+ctx.shadowBlur=20;
+ctx.shadowColor=`hsl(${(hueShift+i*2)%360},100%,60%)`;
+
 ctx.beginPath();
 ctx.moveTo(p1.x,p1.y);
 ctx.lineTo(p2.x,p2.y);
 ctx.stroke();
 }
 
+ctx.shadowBlur=30;
+ctx.shadowColor=`hsl(${hueShift%360},100%,60%)`;
 ctx.beginPath();
 ctx.arc(this.x,this.y,this.radius,0,Math.PI*2);
-ctx.fillStyle=this.color;
+ctx.fillStyle=`hsl(${hueShift%360},100%,50%)`;
 ctx.fill();
+
+ctx.shadowBlur=0;
 }
 }
 
 class Food{
 constructor(){
-this.x=(Math.random()-0.5)*MAP_SIZE;
-this.y=(Math.random()-0.5)*MAP_SIZE;
-this.radius=6;
-this.color=`hsl(${Math.random()*360},100%,60%)`;
+this.x=(Math.random()-0.5)*2000;
+this.y=(Math.random()-0.5)*2000;
+this.radius=6+Math.random()*4;
+this.hue=Math.random()*360;
+this.pulse=0;
 }
+
 draw(){
-ctx.shadowBlur=10;
-ctx.shadowColor=this.color;
-ctx.fillStyle=this.color;
+this.pulse+=0.05;
+let size=this.radius+Math.sin(this.pulse)*1.5;
+
+ctx.shadowBlur=20;
+ctx.shadowColor=`hsl(${this.hue},100%,60%)`;
+ctx.fillStyle=`hsl(${this.hue},100%,50%)`;
 ctx.beginPath();
-ctx.arc(this.x,this.y,this.radius,0,Math.PI*2);
+ctx.arc(this.x,this.y,size,0,Math.PI*2);
 ctx.fill();
 ctx.shadowBlur=0;
 }
 }
 
-class Particle{
-constructor(x,y,color){
-this.x=x;
-this.y=y;
-this.dx=(Math.random()-0.5)*6;
-this.dy=(Math.random()-0.5)*6;
-this.life=60;
-this.color=color;
-}
-update(){
-this.x+=this.dx;
-this.y+=this.dy;
-this.life--;
-}
-draw(){
-ctx.fillStyle=this.color;
-ctx.fillRect(this.x,this.y,4,4);
-}
-}
+let player;
+let foods=[];
 
-let player,enemies,foods;
-
-function initGame(){
-player=new Snake(0,0,"#00ffcc");
-enemies=[];
+function init(){
+player=new Snake(0,0);
 foods=[];
-for(let i=0;i<5;i++){
-enemies.push(new Snake(
-(Math.random()-0.5)*2000,
-(Math.random()-0.5)*2000,
-`hsl(${Math.random()*360},100%,60%)`,
-true
-));
-}
-for(let i=0;i<150;i++){
+for(let i=0;i<200;i++){
 foods.push(new Food());
 }
-document.getElementById("score").innerText=0;
+document.getElementById("score").innerText="Score: 0";
 }
 
 function startGame(){
@@ -233,63 +183,40 @@ gamePaused=!gamePaused;
 }
 
 function restartGame(){
-initGame();
+init();
 gameRunning=true;
 gamePaused=false;
 }
 
 function updateCamera(){
-camera.x+= (player.x-camera.x)*0.1;
-camera.y+= (player.y-camera.y)*0.1;
+camera.x+=(player.x-camera.x)*0.1;
+camera.y+=(player.y-camera.y)*0.1;
 camera.zoom=1/(1+player.mass*0.002);
 }
 
-function checkFood(snake){
+function checkFood(){
 foods.forEach((f,i)=>{
-let dx=snake.x-f.x;
-let dy=snake.y-f.y;
-if(Math.sqrt(dx*dx+dy*dy)<snake.radius){
-snake.mass+=5;
+let dx=player.x-f.x;
+let dy=player.y-f.y;
+if(Math.sqrt(dx*dx+dy*dy)<player.radius){
+player.mass+=5;
 foods.splice(i,1);
 foods.push(new Food());
-if(snake===player){
-document.getElementById("score").innerText=snake.mass;
-playSound(300);
-}
+document.getElementById("score").innerText="Score: "+player.mass;
 }
 });
 }
 
-function killSnake(dead,killer){
-dead.alive=false;
-playSound(120);
-
-for(let i=0;i<80;i++){
-explosionParticles.push(new Particle(dead.x,dead.y,dead.color));
-}
-
-killer.mass+=Math.floor(dead.mass/2);
-}
-
-function checkCollision(a,b){
-if(!a.alive||!b.alive) return;
-for(let i=10;i<b.body.length;i++){
-let dx=a.x-b.body[i].x;
-let dy=a.y-b.body[i].y;
-if(Math.sqrt(dx*dx+dy*dy)<b.radius){
-killSnake(a,b);
-}
-}
-}
-
 let last=0;
-function gameLoop(t){
+function loop(t){
 let dt=(t-last)/1000;
 last=t;
 
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
 if(gameRunning){
+hueShift+=60*dt;
+
 updateCamera();
 
 ctx.save();
@@ -300,38 +227,20 @@ ctx.translate(-camera.x,-camera.y);
 foods.forEach(f=>f.draw());
 
 player.update(dt);
-checkFood(player);
+checkFood();
 player.draw();
-
-enemies.forEach(e=>{
-e.update(dt);
-checkFood(e);
-checkCollision(e,player);
-checkCollision(player,e);
-e.draw();
-});
-
-explosionParticles.forEach((p,i)=>{
-p.update();
-p.draw();
-if(p.life<=0) explosionParticles.splice(i,1);
-});
 
 ctx.restore();
 }
 
-document.getElementById("staminaFill").style.width=
-(player.stamina/player.maxStamina*100)+"%";
-
-requestAnimationFrame(gameLoop);
+requestAnimationFrame(loop);
 }
 
-initGame();
-requestAnimationFrame(gameLoop);
+init();
+requestAnimationFrame(loop);
 
 window.addEventListener("keydown",e=>keys[e.key]=true);
 window.addEventListener("keyup",e=>keys[e.key]=false);
-
 </script>
 </body>
 </html>
